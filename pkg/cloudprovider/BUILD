@@ -20,7 +20,10 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/types:go_default_library",
+        "//pkg/api/errors:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/client/restclient:go_default_library",
+        "//pkg/util/intstr:go_default_library",
         "//vendor:github.com/golang/glog",
     ],
 )
