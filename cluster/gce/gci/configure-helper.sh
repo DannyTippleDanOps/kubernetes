@@ -1170,6 +1170,10 @@ EOF
 }
 
 
+function pre-warm-mounter {
+    ${KUBE_HOME}/bin/mounter &> /dev/null
+}
+
 ########### Main Function ###########
 echo "Start to configure instance for kubernetes"
 
