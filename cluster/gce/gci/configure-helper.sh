@@ -1171,6 +1171,7 @@ EOF
 
 
 function pre-warm-mounter {
+    echo "prewarming mounter"
     ${KUBE_HOME}/bin/mounter &> /dev/null
 }
 
