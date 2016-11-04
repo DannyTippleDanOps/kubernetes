@@ -1169,10 +1169,8 @@ For Kubernetes copyright and licensing information, see:
 EOF
 }
 
-
-function pre-warm-mounter {
-    echo "prewarming mounter"
-    ${KUBE_HOME}/bin/mounter &> /dev/null
+function override-kubectl {
+    echo "export PATH=${KUBE_HOME}/bin:\$PATH" > /etc/profile.d/kube_env.sh
 }
 
 ########### Main Function ###########
