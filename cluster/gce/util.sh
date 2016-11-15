@@ -413,7 +413,7 @@ function create-static-ip() {
       break
     fi
 
-    if cloud compute addresses describe "$1" \
+    if gcloud compute addresses describe "$1" \
       --project "${PROJECT}" \
       --region "${REGION}" >/dev/null 2>&1; then
       # it exists - postcondition satisfied
