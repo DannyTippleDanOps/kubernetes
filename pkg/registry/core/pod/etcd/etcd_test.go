@@ -62,7 +62,7 @@ func validNewPod() *api.Pod {
 					ImagePullPolicy: api.PullAlways,
 
 					TerminationMessagePath: api.TerminationMessagePathDefault,
-					SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
+					SecurityContext:        securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
 				},
 			},
 			SecurityContext: &api.PodSecurityContext{},
@@ -643,7 +643,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 				{
 					Name:            "foobar",
 					Image:           "foo:v1",
-					SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults(),
+					SecurityContext: securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
 				},
 			},
 			SecurityContext: &api.PodSecurityContext{},
@@ -668,7 +668,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 				Image:                  "foo:v2",
 				ImagePullPolicy:        api.PullIfNotPresent,
 				TerminationMessagePath: api.TerminationMessagePathDefault,
-				SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
+				SecurityContext:        securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
 			}},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -711,7 +711,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 			Containers: []api.Container{
 				{
 					Image:           "foo:v1",
-					SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults(),
+					SecurityContext: securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
 				},
 			},
 			SecurityContext: &api.PodSecurityContext{},
