@@ -69,10 +69,9 @@ var (
 	StatefulSetGroupVersionResource = unversioned.GroupVersionResource{Group: apps.GroupName, Version: "v1beta1", Resource: "statefulsets"}
 )
 
-// Time: 25m, slow by design.
 // GCE Quota requirements: 3 pds, one per pet manifest declared above.
 // GCE Api requirements: nodes and master need storage r/w permissions.
-var _ = framework.KubeDescribe("StatefulSet [Slow]", func() {
+var _ = framework.KubeDescribe("StatefulSet", func() {
 	f := framework.NewDefaultFramework("statefulset")
 	var ns string
 	var c clientset.Interface
@@ -354,7 +353,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow]", func() {
 		})
 	})
 
-	framework.KubeDescribe("Deploy clustered applications [Feature:StatefulSet]", func() {
+	framework.KubeDescribe("Deploy clustered applications [Feature:StatefulSet] [Slow]", func() {
 		var pst *statefulSetTester
 		var appTester *clusterAppTester
 
@@ -393,7 +392,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow]", func() {
 	})
 })
 
-var _ = framework.KubeDescribe("Stateful Set recreate [Slow]", func() {
+var _ = framework.KubeDescribe("Stateful Set recreate", func() {
 	f := framework.NewDefaultFramework("pet-set-recreate")
 	var c clientset.Interface
 	var ns string
