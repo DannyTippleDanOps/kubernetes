@@ -267,7 +267,6 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		ServiceCheck{Service: "docker"},
 		FirewalldCheck{ports: []int{int(cfg.API.BindPort), int(cfg.Discovery.BindPort), 10250}},
 		PortOpenCheck{port: int(cfg.API.BindPort)},
-		PortOpenCheck{port: 2379},
 		PortOpenCheck{port: 8080},
 		PortOpenCheck{port: int(cfg.Discovery.BindPort)},
 		PortOpenCheck{port: 10250},
@@ -276,7 +275,6 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddresses[0], Port: int(cfg.API.BindPort)},
 		DirAvailableCheck{Path: "/etc/kubernetes/manifests"},
 		DirAvailableCheck{Path: "/etc/kubernetes/pki"},
-		DirAvailableCheck{Path: "/var/lib/etcd"},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		FileAvailableCheck{Path: "/etc/kubernetes/admin.conf"},
 		FileAvailableCheck{Path: "/etc/kubernetes/kubelet.conf"},
@@ -289,6 +287,14 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		InPathCheck{executable: "socat", mandatory: true},
 		InPathCheck{executable: "tc", mandatory: false},
 		InPathCheck{executable: "touch", mandatory: false},
+	}
+
+	if len(cfg.Etcd.Endpoints) == 0 {
+		// Only do etcd related checks when no external endpoints were specified
+		checks = append(checks,
+			PortOpenCheck{port: 2379},
+			DirAvailableCheck{Path: "/var/lib/etcd"},
+		)
 	}
 
 	return runChecks(checks, os.Stderr)
