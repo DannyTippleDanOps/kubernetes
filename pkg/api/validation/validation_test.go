@@ -6775,7 +6775,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = api.ServiceTypeLoadBalancer
 				newSvc.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
 			},
-			numErrs: 1,
+			numErrs: 0,
 		},
 		{
 			name: "update loadBalancerSourceRanges",
@@ -6785,7 +6785,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = api.ServiceTypeLoadBalancer
 				newSvc.Spec.LoadBalancerSourceRanges = []string{"10.180.0.0/16"}
 			},
-			numErrs: 1,
+			numErrs: 0,
 		},
 		{
 			name: "LoadBalancer type cannot have None ClusterIP",
