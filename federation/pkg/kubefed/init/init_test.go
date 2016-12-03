@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
@@ -441,7 +441,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 	replicas := int32(1)
 
 	namespace := v1.Namespace{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Namespace",
 			APIVersion: testapi.Default.GroupVersion().String(),
 		},
@@ -451,7 +451,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 	}
 
 	svc := v1.Service{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Service",
 			APIVersion: testapi.Default.GroupVersion().String(),
 		},
@@ -486,7 +486,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 	}
 
 	credSecret := v1.Secret{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: testapi.Default.GroupVersion().String(),
 		},
@@ -498,7 +498,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 	}
 
 	cmKubeconfigSecret := v1.Secret{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: testapi.Default.GroupVersion().String(),
 		},
@@ -510,7 +510,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 	}
 
 	pvc := v1.PersistentVolumeClaim{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "PersistentVolumeClaim",
 			APIVersion: testapi.Default.GroupVersion().String(),
 		},
@@ -535,7 +535,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 	}
 
 	apiserver := v1beta1.Deployment{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: testapi.Extensions.GroupVersion().String(),
 		},
@@ -628,7 +628,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 
 	cmName := federationName + "-controller-manager"
 	cm := v1beta1.Deployment{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: testapi.Extensions.GroupVersion().String(),
 		},
