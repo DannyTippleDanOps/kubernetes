@@ -2962,26 +2962,6 @@ func waitForReplicaSetPodsGone(c clientset.Interface, rs *extensions.ReplicaSet)
 	})
 }
 
-// WaitForAvailableReplicaSet waits until the replica set has all of its replicas available
-// and is observed by the replica set controller.
-func WaitForAvailableReplicaSet(c clientset.Interface, ns, name string) error {
-	var status extensions.ReplicaSetStatus
-	err := wait.PollImmediate(Poll, 5*time.Minute, func() (bool, error) {
-		rs, err := c.Extensions().ReplicaSets(ns).Get(name)
-		if err != nil {
-			return false, err
-		}
-		status = rs.Status
-		return rs.Status.ObservedGeneration >= rs.Generation &&
-			*(rs.Spec.Replicas) == rs.Status.Replicas &&
-			*(rs.Spec.Replicas) == rs.Status.AvailableReplicas, nil
-	})
-	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("replica set %q never became available: %#v", name, status)
-	}
-	return err
-}
-
 // Waits for the deployment status to become valid (i.e. max unavailable and max surge aren't violated anymore).
 // Note that the status should stay valid at all times unless shortly after a scaling event or the deployment is just created.
 // To verify that the deployment status is valid and wait for the rollout to finish, use WaitForDeploymentStatus instead.
@@ -2993,7 +2973,7 @@ func WaitForDeploymentStatusValid(c clientset.Interface, d *extensions.Deploymen
 		reason                    string
 	)
 
-	err := wait.PollImmediate(Poll, 5*time.Minute, func() (bool, error) {
+	err := wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
 		var err error
 		deployment, err = c.Extensions().Deployments(d.Namespace).Get(d.Name)
 		if err != nil {
@@ -3065,7 +3045,7 @@ func WaitForDeploymentStatus(c clientset.Interface, d *extensions.Deployment) er
 		deployment                *extensions.Deployment
 	)
 
-	err := wait.PollImmediate(Poll, 5*time.Minute, func() (bool, error) {
+	err := wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
 		var err error
 		deployment, err = c.Extensions().Deployments(d.Namespace).Get(d.Name)
 		if err != nil {
@@ -3120,7 +3100,7 @@ func WaitForDeploymentStatus(c clientset.Interface, d *extensions.Deployment) er
 
 // WaitForDeploymentUpdatedReplicasLTE waits for given deployment to be observed by the controller and has at least a number of updatedReplicas
 func WaitForDeploymentUpdatedReplicasLTE(c clientset.Interface, ns, deploymentName string, minUpdatedReplicas int, desiredGeneration int64) error {
-	err := wait.PollImmediate(Poll, 5*time.Minute, func() (bool, error) {
+	err := wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
 		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 		if err != nil {
 			return false, err
@@ -3139,7 +3119,7 @@ func WaitForDeploymentUpdatedReplicasLTE(c clientset.Interface, ns, deploymentNa
 // WaitForDeploymentRollbackCleared waits for given deployment either started rolling back or doesn't need to rollback.
 // Note that rollback should be cleared shortly, so we only wait for 1 minute here to fail early.
 func WaitForDeploymentRollbackCleared(c clientset.Interface, ns, deploymentName string) error {
-	err := wait.PollImmediate(Poll, 1*time.Minute, func() (bool, error) {
+	err := wait.Poll(Poll, 1*time.Minute, func() (bool, error) {
 		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 		if err != nil {
 			return false, err
@@ -3220,7 +3200,7 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 }
 
 func WaitForOverlappingAnnotationMatch(c clientset.Interface, ns, deploymentName, expected string) error {
-	return wait.PollImmediate(Poll, 1*time.Minute, func() (bool, error) {
+	return wait.Poll(Poll, 1*time.Minute, func() (bool, error) {
 		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 		if err != nil {
 			return false, err
@@ -3254,7 +3234,7 @@ func CheckNewRSAnnotations(c clientset.Interface, ns, deploymentName string, exp
 func WaitForPodsReady(c clientset.Interface, ns, name string, minReadySeconds int) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	options := v1.ListOptions{LabelSelector: label.String()}
-	return wait.PollImmediate(Poll, 5*time.Minute, func() (bool, error) {
+	return wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
 		pods, err := c.Core().Pods(ns).List(options)
 		if err != nil {
 			return false, nil
@@ -3270,7 +3250,7 @@ func WaitForPodsReady(c clientset.Interface, ns, name string, minReadySeconds in
 
 // Waits for the deployment to clean up old rcs.
 func WaitForDeploymentOldRSsNum(c clientset.Interface, ns, deploymentName string, desiredRSNum int) error {
-	return wait.PollImmediate(Poll, 5*time.Minute, func() (bool, error) {
+	return wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
 		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 		if err != nil {
 			return false, err
