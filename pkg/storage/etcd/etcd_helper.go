@@ -524,7 +524,6 @@ func (h *etcdHelper) GuaranteedUpdate(
 		startTime := time.Now()
 		// Swap origBody with data, if origBody is the latest etcd data.
 		opts := etcd.SetOptions{
-			PrevValue: origBody,
 			PrevIndex: index,
 			TTL:       time.Duration(ttl) * time.Second,
 		}
