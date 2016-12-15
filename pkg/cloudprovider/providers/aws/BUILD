@@ -16,6 +16,7 @@ go_library(
         "aws_loadbalancer.go",
         "aws_routes.go",
         "aws_utils.go",
+        "device_allocator.go",
         "log_handler.go",
         "retry_handler.go",
         "sets_ippermissions.go",
@@ -51,6 +52,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "aws_test.go",
+        "device_allocator_test.go",
         "retry_handler_test.go",
     ],
     library = "go_default_library",
