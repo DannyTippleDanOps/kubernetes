@@ -414,7 +414,7 @@ type PersistentVolumeSource struct {
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty" protobuf:"bytes,17,opt,name=photonPersistentDisk"`
 	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
 	// +optional
-	StorageOS *StorageOSVolumeSource `json:"storageos,omitempty" protobuf:"bytes,18,opt,name="storageos"`
+	StorageOS *StorageOSVolumeSource `json:"storageos,omitempty" protobuf:"bytes,18,opt,name=storageos"`
 }
 
 // +genclient=true
@@ -1080,7 +1080,7 @@ type StorageOSVolumeSource struct {
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// +optional
-	FSType *string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
 	// Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	// +optional

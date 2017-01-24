@@ -77,6 +77,7 @@ func (plugin *storageosPlugin) GetPluginName() string {
 }
 
 func (plugin *storageosPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	glog.Infof("storageos: get volume name: %s", spec.Volume.StorageOS.VolumeRef)
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -86,6 +87,7 @@ func (plugin *storageosPlugin) GetVolumeName(spec *volume.Spec) (string, error) 
 }
 
 func (plugin *storageosPlugin) CanSupport(spec *volume.Spec) bool {
+	glog.Infof("storageos: can support")
 	if (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.StorageOS == nil) ||
 		(spec.Volume != nil && spec.Volume.StorageOS == nil) {
 		return false
@@ -134,6 +136,7 @@ func getVolumeSource(spec *volume.Spec) (*v1.StorageOSVolumeSource, bool, error)
 }
 
 func (plugin *storageosPlugin) ConstructVolumeSpec(volumeRef, mountPath string) (*volume.Spec, error) {
+	glog.Infof("storageos: construct volume spec: %s, mountpoint: %s", volumeRef, mountPath)
 	storageosVolume := &v1.Volume{
 		Name: volumeRef,
 		VolumeSource: v1.VolumeSource{
@@ -255,10 +258,10 @@ func (m *storageosMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	//if a trailing slash is missing we add it here
 	if err := m.mounter.Mount(globalVolPath, dir, "", options); err != nil {
-		return fmt.Errorf("quobyte: mount failed: %v", err)
+		return fmt.Errorf("storageos: mount failed: %v", err)
 	}
 
-	glog.V(4).Infof("quobyte: mount set up: %s", dir)
+	glog.V(4).Infof("storageos: mount set up: %s", dir)
 
 	return nil
 }

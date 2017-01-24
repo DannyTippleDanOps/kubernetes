@@ -210,7 +210,7 @@ func (attacher *storageosAttacher) MountDevice(spec *volume.Spec, devicePath str
 	}
 	if notMnt {
 		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}
-		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, *volumeSource.FSType, options)
+		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, options)
 		if err != nil {
 			os.Remove(deviceMountPath)
 			return err

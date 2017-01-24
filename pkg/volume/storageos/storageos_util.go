@@ -20,7 +20,7 @@ const (
 	volumePath = "/storageos/volumes"
 )
 
-type StorageOSUtil struct{}
+// type StorageOSUtil struct{}
 
 //
 // func (util *StorageOSUtil) DeleteVolume(d *StorageOSDiskDeleter) error {
