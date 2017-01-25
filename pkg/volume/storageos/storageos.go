@@ -23,7 +23,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/pborman/uuid"
 
+	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -159,7 +161,7 @@ func (plugin *storageosPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 	}
 
 	return &storageosMounter{
-		storageos: &storageos{
+		&storageos{
 			volName:   spec.Name(),
 			mounter:   mounter,
 			pod:       pod,
@@ -183,6 +185,79 @@ func (plugin *storageosPlugin) newUnmounterInternal(volName string, podUID types
 			plugin:  plugin,
 		},
 	}, nil
+}
+
+func (plugin *storageosPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+	return plugin.newProvisionerInternal(options)
+}
+
+func (plugin *storageosPlugin) newProvisionerInternal(options volume.VolumeOptions) (volume.Provisioner, error) {
+	return &storageosVolumeProvisioner{
+		storageosMounter: &storageosMounter{
+			storageos: &storageos{
+				plugin: plugin,
+			},
+		},
+		options: options,
+	}, nil
+}
+
+type storageosVolumeProvisioner struct {
+	*storageosMounter
+	options volume.VolumeOptions
+}
+
+func (p *storageosVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
+	if p.options.PVC.Spec.Selector != nil {
+		return nil, fmt.Errorf("claim Selector is not supported")
+	}
+	var err error
+	user := ""
+	group := "default"
+	token := ""
+
+	for k, v := range p.options.Parameters {
+		switch dstrings.ToLower(k) {
+		case "user":
+			p.user = v
+		case "group":
+			p.group = v
+		case "pool":
+			p.pool = v
+		case "usersecretname":
+			secretName = v
+		default:
+			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, p.plugin.GetPluginName())
+		}
+	}
+	// sanity check
+	// if p.Pool == "" {
+	// 	p.Pool = "default"
+	// }
+
+	// create random image name
+	image := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
+	p.storageosMounter.Image = image
+	rbd, sizeMB, err := r.manager.CreateImage(r)
+	if err != nil {
+		glog.Errorf("rbd: create volume failed, err: %v", err)
+		return nil, err
+	}
+	glog.Infof("successfully created rbd image %q", image)
+	pv := new(v1.PersistentVolume)
+	rbd.SecretRef = new(v1.LocalObjectReference)
+	rbd.SecretRef.Name = secretName
+	rbd.RadosUser = r.Id
+	pv.Spec.PersistentVolumeSource.RBD = rbd
+	pv.Spec.PersistentVolumeReclaimPolicy = r.options.PersistentVolumeReclaimPolicy
+	pv.Spec.AccessModes = r.options.PVC.Spec.AccessModes
+	if len(pv.Spec.AccessModes) == 0 {
+		pv.Spec.AccessModes = r.plugin.GetAccessModes()
+	}
+	pv.Spec.Capacity = v1.ResourceList{
+		v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dMi", sizeMB)),
+	}
+	return pv, nil
 }
 
 // storageos volumes represent a bare host directory mount of an StorageOS export.
@@ -226,13 +301,13 @@ func (m *storageosMounter) CanMount() error {
 
 // SetUp attaches the disk and bind mounts to the volume path.
 func (m *storageosMounter) SetUp(fsGroup *int64) error {
-	// TODO
 	pluginDir := m.plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(storageosPluginName))
 	return m.SetUpAt(pluginDir, fsGroup)
 }
 
 func (m *storageosMounter) SetUpAt(dir string, fsGroup *int64) error {
 	// TODO: handle failed mounts here.
+	fmt.Printf("StorageOS SetUpAt: %s", dir)
 	notMnt, err := m.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("StorageOS volume set up: %s %v %v, volume name %v readOnly %v", dir, !notMnt, err, m.volName, m.readOnly)
 	if err != nil && !os.IsNotExist(err) {

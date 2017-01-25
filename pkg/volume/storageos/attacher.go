@@ -22,18 +22,20 @@ import (
 	"path"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+
+	"github.com/golang/glog"
+	storageosapi "github.com/storageos/go-api"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 type storageosAttacher struct {
 	host       volume.VolumeHost
 	apiVersion string
-	volMgr     VolumeManager
+	storageos  storageosapi.Client
 }
 
 var _ volume.Attacher = &storageosAttacher{}
