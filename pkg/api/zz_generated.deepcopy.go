@@ -1968,7 +1968,9 @@ func DeepCopy_api_PersistentVolumeSource(in interface{}, out interface{}, c *con
 		if in.StorageOS != nil {
 			in, out := &in.StorageOS, &out.StorageOS
 			*out = new(StorageOSVolumeSource)
-			**out = **in
+			if err := DeepCopy_api_StorageOSVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
@@ -3012,6 +3014,13 @@ func DeepCopy_api_StorageOSVolumeSource(in interface{}, out interface{}, c *conv
 		in := in.(*StorageOSVolumeSource)
 		out := out.(*StorageOSVolumeSource)
 		*out = *in
+		if in.Options != nil {
+			in, out := &in.Options, &out.Options
+			*out = make(map[string]string)
+			for key, val := range *in {
+				(*out)[key] = val
+			}
+		}
 		return nil
 	}
 }
@@ -3212,7 +3221,9 @@ func DeepCopy_api_VolumeSource(in interface{}, out interface{}, c *conversion.Cl
 		if in.StorageOS != nil {
 			in, out := &in.StorageOS, &out.StorageOS
 			*out = new(StorageOSVolumeSource)
-			**out = **in
+			if err := DeepCopy_api_StorageOSVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
 		}
 		return nil
 	}

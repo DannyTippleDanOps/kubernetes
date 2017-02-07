@@ -986,8 +986,8 @@ type AzureDiskVolumeSource struct {
 
 // Represents a StorageOS persistent volume resource.
 type StorageOSVolumeSource struct {
-	// VolumeRef is a string that references StorageOS volume by UUID or name.
-	VolumeRef string
+	// VolumeName is a string that references the StorageOS volume.
+	VolumeName string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
@@ -997,6 +997,9 @@ type StorageOSVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool
+	// Optional: Extra volume options if any.
+	// +optional
+	Options map[string]string
 }
 
 // Adapts a ConfigMap into a volume.

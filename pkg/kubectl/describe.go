@@ -609,6 +609,8 @@ func describeVolumes(volumes []api.Volume, w *PrefixWriter, space string) {
 			printCinderVolumeSource(volume.VolumeSource.Cinder, w)
 		case volume.VolumeSource.PhotonPersistentDisk != nil:
 			printPhotonPersistentDiskVolumeSource(volume.VolumeSource.PhotonPersistentDisk, w)
+		case volume.VolumeSource.StorageOS != nil:
+			printStorageOSVolumeSource(volume.VolumeSource.StorageOS, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -759,6 +761,14 @@ func printCinderVolumeSource(cinder *api.CinderVolumeSource, w *PrefixWriter) {
 		cinder.VolumeID, cinder.FSType, cinder.ReadOnly)
 }
 
+func printStorageOSVolumeSource(storageos *api.StorageOSVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tStorageOS (a StorageOS Persistent Disk resource)\n"+
+		"    VolumeName:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		storageos.VolumeName, storageos.FSType, storageos.ReadOnly)
+}
+
 type PersistentVolumeDescriber struct {
 	clientset.Interface
 }
@@ -820,6 +830,8 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 			printAzureDiskVolumeSource(pv.Spec.AzureDisk, w)
 		case pv.Spec.PhotonPersistentDisk != nil:
 			printPhotonPersistentDiskVolumeSource(pv.Spec.PhotonPersistentDisk, w)
+		case pv.Spec.StorageOS != nil:
+			printStorageOSVolumeSource(pv.Spec.StorageOS, w)
 		}
 
 		if events != nil {

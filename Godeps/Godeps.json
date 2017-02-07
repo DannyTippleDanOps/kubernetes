@@ -2224,6 +2224,10 @@
 			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
 		},
 		{
+			"ImportPath": "github.com/storageos/go-api",
+			"Rev": "f7ef3d91fc0441ce27770cd039dd3a7025bd94c2"
+		},
+		{
 			"ImportPath": "github.com/stretchr/testify/mock",
 			"Comment": "v1.0-88-ge3a8ff8",
 			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"

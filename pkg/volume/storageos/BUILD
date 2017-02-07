@@ -15,7 +15,6 @@ go_library(
         "doc.go",
         "storageos.go",
         "storageos_util.go",
-        "volume_manager.go",
     ],
     tags = ["automanaged"],
     deps = [

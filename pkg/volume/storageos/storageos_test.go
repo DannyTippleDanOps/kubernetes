@@ -21,8 +21,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/golang/glog"
-
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/types"
@@ -38,8 +36,6 @@ func TestCanSupport(t *testing.T) {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	glog.V(4).Infof("quobyte: can support")
-
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
@@ -50,11 +46,11 @@ func TestCanSupport(t *testing.T) {
 	if plug.GetPluginName() != "kubernetes.io/storageos" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
-	if plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{}}}}) {
-		t.Errorf("Expected false")
+	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{StorageOS: &v1.StorageOSVolumeSource{}}}}) {
+		t.Errorf("Expected true")
 	}
-	if plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{}}}) {
-		t.Errorf("Expected false")
+	if !plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{StorageOS: &v1.StorageOSVolumeSource{}}}}}) {
+		t.Errorf("Expected true")
 	}
 }
 
@@ -104,20 +100,19 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	t.Log("found storageos plugin")
 
 	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.(*storageosPlugin).newMounterInternal(spec, pod, &mount.FakeMounter{})
-	volumePath := mounter.GetPath()
+	mounter, err := plug.(*storageosPlugin).newMounterInternal(spec, pod, &storageosUtil{}, &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
 	if mounter == nil {
 		t.Error("Got a nil Mounter")
 	}
-
+	volumePath := mounter.GetPath()
 	t.Logf("volumePath: %s", volumePath)
 
 	path := mounter.GetPath()
 	t.Logf("path: %s", path)
-	expectedPath := fmt.Sprintf("%s/plugins/kubernetes.io~storageos/root#nfsnobody@vol1", tmpDir)
+	expectedPath := fmt.Sprintf("%s/plugins/kubernetes.io~storageos/vol1", tmpDir)
 	if path != expectedPath {
 		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, path)
 	}
@@ -131,7 +126,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	// 		t.Errorf("SetUp() failed: %v", err)
 	// 	}
 	// }
-	unmounter, err := plug.(*storageosPlugin).newUnmounterInternal("vol1", types.UID("poduid"), &mount.FakeMounter{})
+	unmounter, err := plug.(*storageosPlugin).newUnmounterInternal("vol1", types.UID("poduid"), &storageosUtil{}, &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
@@ -152,7 +147,7 @@ func TestPluginVolume(t *testing.T) {
 	vol := &v1.Volume{
 		Name: "vol1",
 		VolumeSource: v1.VolumeSource{
-			StorageOS: &v1.StorageOSVolumeSource{VolumeRef: "vol1", ReadOnly: false},
+			StorageOS: &v1.StorageOSVolumeSource{VolumeName: "vol1", ReadOnly: false},
 		},
 	}
 	doTestPlugin(t, volume.NewSpecFromVolume(vol))
@@ -165,7 +160,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				StorageOS: &v1.StorageOSVolumeSource{VolumeRef: "vol1", ReadOnly: false},
+				StorageOS: &v1.StorageOSVolumeSource{VolumeName: "vol1", ReadOnly: false},
 			},
 		},
 	}
@@ -186,7 +181,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				StorageOS: &v1.StorageOSVolumeSource{VolumeRef: "vol2", ReadOnly: false},
+				StorageOS: &v1.StorageOSVolumeSource{VolumeName: "vol2", ReadOnly: false},
 			},
 			ClaimRef: &v1.ObjectReference{
 				Name: "claimA",

@@ -17,89 +17,189 @@ limitations under the License.
 package storageos
 
 import (
+	"errors"
+	"fmt"
+	"os"
+	"path"
 	"strings"
 
-	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/volume/util"
 
-	"github.com/storageos/go-api/types"
+	"github.com/golang/glog"
+	storageosapi "github.com/storageos/go-api"
+	storageostypes "github.com/storageos/go-api/types"
 )
 
 const (
-	volumePath = "/storageos/volumes"
+	volumePath  = "/storageos/volumes"
+	losetupPath = "losetup"
+
+	optionFSType    = "kubernetes.io/fsType"
+	optionReadWrite = "kubernetes.io/readwrite"
+	optionKeySecret = "kubernetes.io/secret"
+
+	ErrDeviceNotFound = "device not found"
+	ErrNotAvailable   = "not available"
 )
 
-type storageosVolumeManager struct {
-	config *storageosAPIConfig
+// storageosUtil is the utility structure to setup and teardown devices from
+// the host.
+type storageosUtil struct {
+	api *storageosapi.Client
 }
 
-func (manager *storageosVolumeManager) createVolume(provisioner *storageosVolumeProvisioner) (storageos *v1.StorageOSVolumeSource, size int, err error) {
-	capacity := provisioner.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	volumeSize := int(volume.RoundUpSize(capacity.Value(), 1024*1024*1024))
-	volumeOptions := &types.CreateVolumeOptions{
-		Name: provisioner.volumeRef,
-		Size: volumeSize,
+// client returns a StorageOS API Client using default settings.
+func (u *storageosUtil) client() *storageosapi.Client {
+	if u.api == nil {
+		api, err := storageosapi.NewVersionedClient(defaultAPIAddress, defaultAPIVersion)
+		if err == nil {
+			u.api = api
+		}
+		api.SetAuth(defaultAPIUser, defaultAPIPassword)
+	}
+	return u.api
+}
+
+// Creates a new StorageOS volume and makes it available as a file device within
+// /storageos/volumes.
+func (u *storageosUtil) create(v *storageosVolumeProvisioner) error {
+
+	opts := storageostypes.CreateVolumeOptions{
+		Name: v.volName,
 	}
 
-	if _, err := manager.createStorageOSClient().CreateVolume(volumeOptions); err != nil {
-		return &v1.StorageOSVolumeSource{}, volumeSize, err
-	}
+	glog.V(4).Infof("storageos: create opts: %#v", opts)
 
-	glog.V(4).Infof("Created StorageOS volume %s", provisioner.volume)
-	return &v1.StorageOSVolumeSource{
-		VolumeRef: provisioner.volumeRef,
-	}, volumeSize, nil
+	// fetch the volName details from the StorageOS API
+	// _, err := u.client().CreateVolume(opts)
+	// if err != nil {
+	// 	// TODO: return better error for Not found
+	// 	return err
+	// }
+	return nil
 }
 
-// func (manager *storageosVolumeManager) deleteVolume(deleter *storageosVolumeDeleter) error {
-// 	return manager.createStorageOSClient().RemoveVolume(deleter.volume)
-// }
-
-func (manager *storageosVolumeManager) createStorageOSClient() *storageos.Client {
-	return storageos.NewClient("tcp://localhost:8000")
-}
-
-func (mounter *storageosMounter) pluginDirIsMounted(pluginDir string) (bool, error) {
-	mounts, err := mounter.mounter.List()
+// Attach exposes a volume on the host.  StorageOS uses a global namespace, so
+// if the volume exists, it should already be available as a file device within
+// /storageos/volumes.  Attach creates a loop device and returns the path to it.
+func (u *storageosUtil) attach(b *storageosMounter) (string, error) {
+	// fetch the volName details from the StorageOS API
+	vol, err := u.client().GetVolume(b.volName)
 	if err != nil {
-		return false, err
+		// TODO: return better error for Not found
+		return "", err
+	}
+	fileDevicePath := path.Join(volumePath, vol.ID)
+	blockDevicePath, err := getTargetLoopDevPath(fileDevicePath)
+	if err != nil && err.Error() != ErrDeviceNotFound {
+		return "", err
 	}
 
-	for _, mountPoint := range mounts {
-		if strings.HasPrefix(mountPoint.Type, "storageos") {
-			continue
-		}
-
-		if mountPoint.Path == pluginDir {
-			glog.V(4).Infof("storageos: found mountpoint %s in /proc/mounts", mountPoint.Path)
-			return true, nil
+	// If no existing loop device for the volume, create one
+	if blockDevicePath == "" {
+		glog.V(4).Infof("Creating device for volume: %s", b.volName)
+		blockDevicePath, err = makeLoopDev(fileDevicePath)
+		if err != nil {
+			return "", err
 		}
 	}
-
-	return false, nil
+	return blockDevicePath, nil
 }
 
-// type StorageOSUtil struct{}
+// Detach detaches a volume from the host.
+func (u *storageosUtil) detach(b *storageosUnmounter, loopDevice string) error {
+	return removeLoopDev(loopDevice)
+}
 
-//
-// func (util *StorageOSUtil) DeleteVolume(d *StorageOSDiskDeleter) error {
-// 	var deleted = true
-// 	// cloud, err := getCloudProvider(d.awsElasticBlockStore.plugin.host.GetCloudProvider())
-// 	// if err != nil {
-// 	// 	return err
-// 	// }
-// 	//
-// 	// deleted, err := cloud.DeleteDisk(d.volumeID)
-// 	// if err != nil {
-// 	// 	// AWS cloud provider returns volume.deletedVolumeInUseError when
-// 	// 	// necessary, no handling needed here.
-// 	// 	glog.V(2).Infof("Error deleting EBS Disk volume %s: %v", d.volumeID, err)
-// 	// 	return err
-// 	// }
-// 	if deleted {
-// 		glog.V(2).Infof("Successfully deleted EBS Disk volume %s", d.volumeID)
-// 	} else {
-// 		glog.V(2).Infof("Successfully deleted EBS Disk volume %s (actually already deleted)", d.volumeID)
-// 	}
-// 	return nil
-// }
+// Mount mounts the volume on the host.
+func (u *storageosUtil) mount(b *storageosMounter, mntDevice, deviceMountPath string) error {
+	notMnt, err := b.mounter.IsLikelyNotMountPoint(deviceMountPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			if err = os.MkdirAll(deviceMountPath, 0750); err != nil {
+				return err
+			}
+			notMnt = true
+		} else {
+			return err
+		}
+	}
+	if err = os.MkdirAll(deviceMountPath, 0750); err != nil {
+		glog.Errorf("mkdir failed on disk %s (%v)", deviceMountPath, err)
+		return err
+	}
+	options := []string{}
+	if b.readOnly {
+		options = append(options, "ro")
+	}
+	if notMnt {
+		err = b.blockDeviceMounter.FormatAndMount(mntDevice, deviceMountPath, b.fsType, options)
+		if err != nil {
+			os.Remove(deviceMountPath)
+			return err
+		}
+
+	}
+	return nil
+}
+
+// Unmount unmounts the volume on the host.
+func (u *storageosUtil) unmount(b *storageosUnmounter, mountPath string) error {
+	return util.UnmountPath(mountPath, b.mounter)
+}
+
+// Returns the full path to the loop device associated with the given file target.
+func getTargetLoopDevPath(target string) (string, error) {
+	_, err := os.Stat(target)
+	if os.IsNotExist(err) {
+		return "", errors.New(ErrNotAvailable)
+	}
+	if err != nil {
+		return "", fmt.Errorf("not attachable: %v", err)
+	}
+
+	exec := exec.New()
+	args := []string{"-j", target}
+	out, err := exec.Command(losetupPath, args...).CombinedOutput()
+	if err != nil {
+		glog.V(2).Infof("Failed device discover command for path %s: %v", target, err)
+		return "", err
+	}
+	return parseLosetupOutputForDevice(out)
+}
+
+func makeLoopDev(pathname string) (string, error) {
+	exec := exec.New()
+	args := []string{"-f", "--show", pathname}
+	out, err := exec.Command(losetupPath, args...).CombinedOutput()
+	if err != nil {
+		glog.V(2).Infof("Failed device create command for path %s: %v", pathname, err)
+		return "", err
+	}
+	return parseLosetupOutputForDevice(out)
+}
+
+func removeLoopDev(device string) error {
+	exec := exec.New()
+	args := []string{"-d", device}
+	_, err := exec.Command(losetupPath, args...).CombinedOutput()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func parseLosetupOutputForDevice(output []byte) (string, error) {
+	if len(output) == 0 {
+		return "", errors.New(ErrDeviceNotFound)
+	}
+
+	// losetup returns device in the format:
+	// /dev/loop1: [0073]:148662 (/storageos/volumes/308f14af-cf0a-08ff-c9c3-b48104318e05)
+	device := strings.TrimSpace(strings.SplitN(string(output), ":", 2)[0])
+	if len(device) == 0 {
+		return "", errors.New(ErrDeviceNotFound)
+	}
+	return device, nil
+}
