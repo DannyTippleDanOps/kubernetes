@@ -64,6 +64,9 @@ const (
 	defaultAPIPassword = "storageos"
 	defaultAPIVersion  = "1"
 	defaultFSType      = "ext2"
+	defaultSizeGB      = 1
+	defaultPool        = "default"
+	defaultNamespace   = "default"
 
 	checkSleepDuration = time.Second
 )
@@ -86,7 +89,7 @@ func (plugin *storageosPlugin) GetVolumeName(spec *volume.Spec) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	return volumeSource.VolumeName, nil
+	return volumeSource.VolumeID, nil
 }
 
 func (plugin *storageosPlugin) CanSupport(spec *volume.Spec) bool {
@@ -150,13 +153,31 @@ func (plugin *storageosPlugin) newUnmounterInternal(volName string, podUID types
 	}, nil
 }
 
+func (plugin *storageosPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+	return plugin.newDeleterInternal(spec, &storageosUtil{})
+}
+
+func (plugin *storageosPlugin) newDeleterInternal(spec *volume.Spec, manager storageosManager) (volume.Deleter, error) {
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.StorageOS == nil {
+		return nil, fmt.Errorf("spec.PersistentVolumeSource.StorageOS is nil")
+	}
+	return &storageosDeleter{
+		storageos: &storageos{
+			volName: spec.Name(),
+			volID:   spec.PersistentVolume.Spec.StorageOS.VolumeID,
+			manager: manager,
+			plugin:  plugin,
+		}}, nil
+}
+
 func (plugin *storageosPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	glog.Infof("storageos: ConstructVolumeSpec: volumeName: %s, mountPath: %s", volumeName, mountPath)
+	volID := "TODO"
 	storageosVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
 			StorageOS: &v1.StorageOSVolumeSource{
-				VolumeName: volumeName,
+				VolumeID: volID,
 			},
 		},
 	}
@@ -164,8 +185,6 @@ func (plugin *storageosPlugin) ConstructVolumeSpec(volumeName, mountPath string)
 }
 
 func (plugin *storageosPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	glog.Infof("storageos: NewProvisioner")
-	glog.V(4).Infof("storageos plugin NewProvisioner called, returning storageos provisioner")
 	return plugin.newProvisionerInternal(options, &storageosUtil{})
 }
 
@@ -182,7 +201,7 @@ func (plugin *storageosPlugin) NewProvisioner(options volume.VolumeOptions) (vol
 // }
 
 func (plugin *storageosPlugin) newProvisionerInternal(options volume.VolumeOptions, manager storageosManager) (volume.Provisioner, error) {
-	return &storageosVolumeProvisioner{
+	return &storageosProvisioner{
 		storageos: &storageos{
 			manager: manager,
 			plugin:  plugin,
@@ -191,28 +210,39 @@ func (plugin *storageosPlugin) newProvisionerInternal(options volume.VolumeOptio
 	}, nil
 }
 
-type storageosVolumeProvisioner struct {
+type storageosDeleter struct {
+	*storageos
+}
+
+var _ volume.Deleter = &storageosDeleter{}
+
+func (d *storageosDeleter) GetPath() string {
+	return getPath(d.podUID, d.volName, d.plugin.host)
+}
+
+func (d *storageosDeleter) Delete() error {
+	return d.manager.delete(d)
+}
+
+type storageosProvisioner struct {
 	*storageos
 	options volume.VolumeOptions
 }
 
-func (v *storageosVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
-	glog.Infof("storageos: Provision v: %#v", v)
+var _ volume.Provisioner = &storageosProvisioner{}
+
+func (v *storageosProvisioner) Provision() (*v1.PersistentVolume, error) {
+	// glog.Infof("storageos: Provision v: %#v", v)
+	// glog.Infof("storageos: Provision v.options.PVC: %#v", v.options.PVC)
+	// glog.Infof("storageos: Provision v.options.Parameters: %#v", v.options.Parameters)
 	if v.options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
 
-	// volPath, sizeKB, err := v.manager.CreateVolume(v)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	err := v.manager.create(v)
+	volID, sizeGB, labels, err := v.manager.create(v)
 	if err != nil {
 		return nil, err
 	}
-
-	volPath := "storageos-UUID-volPath"
-	sizeKB := 5242880
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: v1.ObjectMeta{
@@ -226,12 +256,13 @@ func (v *storageosVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			PersistentVolumeReclaimPolicy: v.options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   v.options.PVC.Spec.AccessModes,
 			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dKi", sizeKB)),
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				StorageOS: &v1.StorageOSVolumeSource{
-					VolumeName: volPath,
-					FSType:     defaultFSType,
+					VolumeID: volID,
+					FSType:   defaultFSType,
+					ReadOnly: false,
 				},
 			},
 		},
@@ -239,8 +270,17 @@ func (v *storageosVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	if len(v.options.PVC.Spec.AccessModes) == 0 {
 		pv.Spec.AccessModes = v.plugin.GetAccessModes()
 	}
-	glog.V(3).Infof("storageos: Provision volume %#v", pv)
 
+	if len(labels) != 0 {
+		if pv.Labels == nil {
+			pv.Labels = make(map[string]string)
+		}
+		for k, v := range labels {
+			pv.Labels[k] = v
+		}
+	}
+
+	glog.V(3).Infof("storageos: Provision volume %#v", pv)
 	return pv, nil
 }
 
@@ -252,6 +292,8 @@ type storageos struct {
 	podNamespace string
 	// podName is the name of the pod.
 	podName string
+	// volName is the ID of the pod volume.
+	volID string
 	// volName is the name of the pod volume.
 	volName string
 	// fsType is the type of the filesystem to create on the volume.
@@ -451,8 +493,8 @@ func (b *storageosUnmounter) TearDownAt(dir string) error {
 
 // storageosManager is the abstract interface to StorageOS volume ops.
 type storageosManager interface {
-	// Creates a StorageOS volume..
-	create(provisioner *storageosVolumeProvisioner) error
+	// Creates a StorageOS volume.
+	create(provisioner *storageosProvisioner) (string, int, map[string]string, error)
 	// Attaches the disk to the kubelet's host machine.
 	attach(mounter *storageosMounter) (string, error)
 	// Detaches the disk from the kubelet's host machine.
@@ -461,6 +503,8 @@ type storageosManager interface {
 	mount(mounter *storageosMounter, mnt, dir string) error
 	// Unmounts the disk from the Kubelet's host machine.
 	unmount(unounter *storageosUnmounter, dir string) error
+	// Deletes the storageos volume.  All data will be lost.
+	delete(deleter *storageosDeleter) error
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.StorageOSVolumeSource, bool, error) {

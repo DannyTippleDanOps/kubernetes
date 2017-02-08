@@ -23,7 +23,9 @@ import (
 	"path"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 
 	"github.com/golang/glog"
@@ -63,21 +65,33 @@ func (u *storageosUtil) client() *storageosapi.Client {
 
 // Creates a new StorageOS volume and makes it available as a file device within
 // /storageos/volumes.
-func (u *storageosUtil) create(v *storageosVolumeProvisioner) error {
+func (u *storageosUtil) create(p *storageosProvisioner) (string, int, map[string]string, error) {
+
+	namespace := p.options.PVC.Namespace
+	if namespace == "" {
+		namespace = defaultNamespace
+	}
+
+	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	requestBytes := capacity.Value()
+	requestGB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
 
 	opts := storageostypes.CreateVolumeOptions{
-		Name: v.volName,
+		Name:        p.options.PVName,
+		Description: namespace,
+		Size:        requestGB,
+		Pool:        defaultPool,
 	}
 
 	glog.V(4).Infof("storageos: create opts: %#v", opts)
 
 	// fetch the volName details from the StorageOS API
-	// _, err := u.client().CreateVolume(opts)
-	// if err != nil {
-	// 	// TODO: return better error for Not found
-	// 	return err
-	// }
-	return nil
+	vol, err := u.client().CreateVolume(opts)
+	if err != nil {
+		// TODO: return better error for Not found
+		return "", 0, nil, err
+	}
+	return vol.ID, requestGB, vol.Labels, nil
 }
 
 // Attach exposes a volume on the host.  StorageOS uses a global namespace, so
@@ -147,6 +161,11 @@ func (u *storageosUtil) mount(b *storageosMounter, mntDevice, deviceMountPath st
 // Unmount unmounts the volume on the host.
 func (u *storageosUtil) unmount(b *storageosUnmounter, mountPath string) error {
 	return util.UnmountPath(mountPath, b.mounter)
+}
+
+// Deletes a StorageOS volume.  Assumes it has already been unmounted and detached.
+func (u *storageosUtil) delete(d *storageosDeleter) error {
+	return nil
 }
 
 // Returns the full path to the loop device associated with the given file target.

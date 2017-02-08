@@ -1074,8 +1074,8 @@ type AzureDiskVolumeSource struct {
 
 // Represents a StorageOS persistent volume resource.
 type StorageOSVolumeSource struct {
-	// VolumeName is a string that references a StorageOS volume by name.
-	VolumeName string `json:"volumeRef" protobuf:"bytes,1,opt,name=volumeRef"`
+	// VolumeID is a string that references a StorageOS volume by id.
+	VolumeID string `json:"volumeID" protobuf:"bytes,1,opt,name=volumeID"`
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.

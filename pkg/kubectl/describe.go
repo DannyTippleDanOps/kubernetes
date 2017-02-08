@@ -763,10 +763,10 @@ func printCinderVolumeSource(cinder *api.CinderVolumeSource, w *PrefixWriter) {
 
 func printStorageOSVolumeSource(storageos *api.StorageOSVolumeSource, w *PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tStorageOS (a StorageOS Persistent Disk resource)\n"+
-		"    VolumeName:\t%v\n"+
+		"    VolumeID:\t%v\n"+
 		"    FSType:\t%v\n"+
 		"    ReadOnly:\t%v\n",
-		storageos.VolumeName, storageos.FSType, storageos.ReadOnly)
+		storageos.VolumeID, storageos.FSType, storageos.ReadOnly)
 }
 
 type PersistentVolumeDescriber struct {

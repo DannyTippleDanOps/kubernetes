@@ -19,6 +19,7 @@ package storageos
 import (
 	"fmt"
 	"os"
+	"path"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -73,6 +74,148 @@ func TestGetAccessModes(t *testing.T) {
 	}
 }
 
+type fakePDManager struct {
+}
+
+func (fake *fakePDManager) create(p *storageosProvisioner) (volID string, sizeGB int, labels map[string]string, err error) {
+	labels = make(map[string]string)
+	labels["fakepdmanager"] = "yes"
+	return "test-storageos-volume-name", 100, labels, nil
+}
+
+func (fake *fakePDManager) attach(b *storageosMounter) (string, error) {
+	return "", nil
+}
+
+func (fake *fakePDManager) detach(b *storageosUnmounter, loopDevice string) error {
+	return nil
+}
+
+func (fake *fakePDManager) mount(b *storageosMounter, mntDevice, deviceMountPath string) error {
+	return nil
+}
+
+func (fake *fakePDManager) unmount(b *storageosUnmounter, mountPath string) error {
+	return nil
+}
+
+func (fake *fakePDManager) delete(d *storageosDeleter) error {
+	if d.volName != "test-storageos-volume-name" {
+		return fmt.Errorf("Deleter got unexpected volume name: %s", d.volName)
+	}
+	return nil
+}
+
+func TestPlugin(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("storageos_test")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/storageos")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	spec := &v1.Volume{
+		Name: "vol1",
+		VolumeSource: v1.VolumeSource{
+			StorageOS: &v1.StorageOSVolumeSource{
+				VolumeID: "base64hash",
+				FSType:   "ext4",
+			},
+		},
+	}
+	fakeManager := &fakePDManager{}
+	fakeMounter := &mount.FakeMounter{}
+	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: types.UID("poduid")}}
+	mounter, err := plug.(*storageosPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), pod, fakeManager, fakeMounter)
+	if err != nil {
+		t.Errorf("Failed to make a new Mounter: %v", err)
+	}
+	if mounter == nil {
+		t.Errorf("Got a nil Mounter")
+	}
+
+	volPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~storageos/vol1")
+	path := mounter.GetPath()
+	if path != volPath {
+		t.Errorf("Got unexpected path: %s", path)
+	}
+
+	if err := mounter.SetUp(nil); err != nil {
+		t.Errorf("Expected success, got: %v", err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("SetUp() failed, volume path not created: %s", path)
+		} else {
+			t.Errorf("SetUp() failed: %v", err)
+		}
+	}
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("SetUp() failed, volume path not created: %s", path)
+		} else {
+			t.Errorf("SetUp() failed: %v", err)
+		}
+	}
+
+	fakeManager = &fakePDManager{}
+	unmounter, err := plug.(*storageosPlugin).newUnmounterInternal("vol1", types.UID("poduid"), fakeManager, fakeMounter)
+	if err != nil {
+		t.Errorf("Failed to make a new Unmounter: %v", err)
+	}
+	if unmounter == nil {
+		t.Errorf("Got a nil Unmounter")
+	}
+
+	if err := unmounter.TearDown(); err != nil {
+		t.Errorf("Expected success, got: %v", err)
+	}
+	if _, err := os.Stat(path); err == nil {
+		t.Errorf("TearDown() failed, volume path still exists: %s", path)
+	} else if !os.IsNotExist(err) {
+		t.Errorf("SetUp() failed: %v", err)
+	}
+
+	// Test Provisioner
+	options := volume.VolumeOptions{
+		PVC: volumetest.CreateTestPVC("100Mi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+	}
+	provisioner, err := plug.(*storageosPlugin).newProvisionerInternal(options, &fakePDManager{})
+	persistentSpec, err := provisioner.Provision()
+	if err != nil {
+		t.Errorf("Provision() failed: %v", err)
+	}
+
+	if persistentSpec.Spec.PersistentVolumeSource.StorageOS.VolumeID != "test-storageos-volume-name" {
+		t.Errorf("Provision() returned unexpected volume ID: %s", persistentSpec.Spec.PersistentVolumeSource.StorageOS.VolumeID)
+	}
+	cap := persistentSpec.Spec.Capacity[v1.ResourceStorage]
+	size := cap.Value()
+	if size != 100*1024*1024*1024 {
+		t.Errorf("Provision() returned unexpected volume size: %v", size)
+	}
+
+	if persistentSpec.Labels["fakepdmanager"] != "yes" {
+		t.Errorf("Provision() returned unexpected labels: %v", persistentSpec.Labels)
+	}
+
+	// Test Deleter
+	volSpec := &volume.Spec{
+		PersistentVolume: persistentSpec,
+	}
+	deleter, err := plug.(*storageosPlugin).newDeleterInternal(volSpec, &fakePDManager{})
+	err = deleter.Delete()
+	if err != nil {
+		t.Errorf("Deleter() failed: %v", err)
+	}
+}
+
 func contains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
 	for _, m := range modes {
 		if m == mode {
@@ -97,8 +240,6 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		t.Errorf("Can't find the plugin by name")
 	}
 
-	t.Log("found storageos plugin")
-
 	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, err := plug.(*storageosPlugin).newMounterInternal(spec, pod, &storageosUtil{}, &mount.FakeMounter{})
 	if err != nil {
@@ -119,13 +260,13 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if err := mounter.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
-	// if _, err := os.Stat(volumePath); err != nil {
-	// 	if os.IsNotExist(err) {
-	// 		t.Errorf("SetUp() failed, volume path not created: %s", volumePath)
-	// 	} else {
-	// 		t.Errorf("SetUp() failed: %v", err)
-	// 	}
-	// }
+	if _, err := os.Stat(volumePath); err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("SetUp() failed, volume path not created: %s", volumePath)
+		} else {
+			t.Errorf("SetUp() failed: %v", err)
+		}
+	}
 	unmounter, err := plug.(*storageosPlugin).newUnmounterInternal("vol1", types.UID("poduid"), &storageosUtil{}, &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
@@ -147,7 +288,7 @@ func TestPluginVolume(t *testing.T) {
 	vol := &v1.Volume{
 		Name: "vol1",
 		VolumeSource: v1.VolumeSource{
-			StorageOS: &v1.StorageOSVolumeSource{VolumeName: "vol1", ReadOnly: false},
+			StorageOS: &v1.StorageOSVolumeSource{VolumeID: "base64hash", ReadOnly: false},
 		},
 	}
 	doTestPlugin(t, volume.NewSpecFromVolume(vol))
@@ -160,7 +301,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				StorageOS: &v1.StorageOSVolumeSource{VolumeName: "vol1", ReadOnly: false},
+				StorageOS: &v1.StorageOSVolumeSource{VolumeID: "base64hash", ReadOnly: false},
 			},
 		},
 	}
@@ -181,7 +322,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				StorageOS: &v1.StorageOSVolumeSource{VolumeName: "vol2", ReadOnly: false},
+				StorageOS: &v1.StorageOSVolumeSource{VolumeID: "base64hash", ReadOnly: false},
 			},
 			ClaimRef: &v1.ObjectReference{
 				Name: "claimA",

@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "attacher.go",
         "doc.go",
         "storageos.go",
         "storageos_util.go",
