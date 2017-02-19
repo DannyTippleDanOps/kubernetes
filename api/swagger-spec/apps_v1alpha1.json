@@ -1459,6 +1459,10 @@
      "photonPersistentDisk": {
       "$ref": "v1.PhotonPersistentDiskVolumeSource",
       "description": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine"
+     },
+     "storageos": {
+      "$ref": "v1.StorageOSVolumeSource",
+      "description": "StorageOS represents a StorageOS mount on the host that shares a pod's lifetime"
      }
     }
    },

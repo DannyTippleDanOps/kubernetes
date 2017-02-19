@@ -29,6 +29,7 @@ import (
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -61,7 +62,6 @@ func TestGetAccessModes(t *testing.T) {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
@@ -75,33 +75,45 @@ func TestGetAccessModes(t *testing.T) {
 }
 
 type fakePDManager struct {
+	attachCalled  bool
+	detachCalled  bool
+	mountCalled   bool
+	unmountCalled bool
+	createCalled  bool
+	deleteCalled  bool
 }
 
 func (fake *fakePDManager) create(p *storageosProvisioner) (volID string, sizeGB int, labels map[string]string, err error) {
+	fake.createCalled = true
 	labels = make(map[string]string)
 	labels["fakepdmanager"] = "yes"
 	return "test-storageos-volume-name", 100, labels, nil
 }
 
 func (fake *fakePDManager) attach(b *storageosMounter) (string, error) {
+	fake.attachCalled = true
 	return "", nil
 }
 
 func (fake *fakePDManager) detach(b *storageosUnmounter, loopDevice string) error {
+	fake.detachCalled = true
 	return nil
 }
 
 func (fake *fakePDManager) mount(b *storageosMounter, mntDevice, deviceMountPath string) error {
+	fake.mountCalled = true
 	return nil
 }
 
 func (fake *fakePDManager) unmount(b *storageosUnmounter, mountPath string) error {
-	return nil
+	fake.unmountCalled = true
+	return util.UnmountPath(mountPath, b.mounter)
 }
 
 func (fake *fakePDManager) delete(d *storageosDeleter) error {
-	if d.volName != "test-storageos-volume-name" {
-		return fmt.Errorf("Deleter got unexpected volume name: %s", d.volName)
+	fake.deleteCalled = true
+	if d.volID != "test-storageos-volume-name" {
+		return fmt.Errorf("Deleter got unexpected volume name: %s", d.volID)
 	}
 	return nil
 }
@@ -124,14 +136,15 @@ func TestPlugin(t *testing.T) {
 		VolumeSource: v1.VolumeSource{
 			StorageOS: &v1.StorageOSVolumeSource{
 				VolumeID: "base64hash",
-				FSType:   "ext4",
+				FSType:   "ext3",
 			},
 		},
 	}
-	fakeManager := &fakePDManager{}
-	fakeMounter := &mount.FakeMounter{}
+
+	// Test Mounter
 	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.(*storageosPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), pod, fakeManager, fakeMounter)
+	fakeManager := &fakePDManager{}
+	mounter, err := plug.(*storageosPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), pod, fakeManager, &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -163,8 +176,16 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 
+	if !fakeManager.attachCalled {
+		t.Errorf("Attach not called")
+	}
+	if !fakeManager.mountCalled {
+		t.Errorf("Mount not called")
+	}
+
+	// Test Unmounter
 	fakeManager = &fakePDManager{}
-	unmounter, err := plug.(*storageosPlugin).newUnmounterInternal("vol1", types.UID("poduid"), fakeManager, fakeMounter)
+	unmounter, err := plug.(*storageosPlugin).newUnmounterInternal("vol1", types.UID("poduid"), fakeManager, &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
@@ -181,12 +202,23 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("SetUp() failed: %v", err)
 	}
 
+	if !fakeManager.unmountCalled {
+		t.Errorf("Unmount not called")
+	}
+	if !fakeManager.detachCalled {
+		t.Errorf("Detach not called")
+	}
+
 	// Test Provisioner
+	fakeManager = &fakePDManager{}
 	options := volume.VolumeOptions{
 		PVC: volumetest.CreateTestPVC("100Mi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
-	provisioner, err := plug.(*storageosPlugin).newProvisionerInternal(options, &fakePDManager{})
+	provisioner, err := plug.(*storageosPlugin).newProvisionerInternal(options, fakeManager)
+	if err != nil {
+		t.Errorf("newProvisionerInternal() failed: %v", err)
+	}
 	persistentSpec, err := provisioner.Provision()
 	if err != nil {
 		t.Errorf("Provision() failed: %v", err)
@@ -204,15 +236,25 @@ func TestPlugin(t *testing.T) {
 	if persistentSpec.Labels["fakepdmanager"] != "yes" {
 		t.Errorf("Provision() returned unexpected labels: %v", persistentSpec.Labels)
 	}
+	if !fakeManager.createCalled {
+		t.Errorf("Create not called")
+	}
 
 	// Test Deleter
+	fakeManager = &fakePDManager{}
 	volSpec := &volume.Spec{
 		PersistentVolume: persistentSpec,
 	}
-	deleter, err := plug.(*storageosPlugin).newDeleterInternal(volSpec, &fakePDManager{})
+	deleter, err := plug.(*storageosPlugin).newDeleterInternal(volSpec, fakeManager)
+	if err != nil {
+		t.Errorf("newDeleterInternal() failed: %v", err)
+	}
 	err = deleter.Delete()
 	if err != nil {
 		t.Errorf("Deleter() failed: %v", err)
+	}
+	if !fakeManager.deleteCalled {
+		t.Errorf("Delete not called")
 	}
 }
 
@@ -223,90 +265,6 @@ func contains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAcc
 		}
 	}
 	return false
-}
-
-func doTestPlugin(t *testing.T, spec *volume.Spec) {
-	tmpDir, err := utiltesting.MkTmpdir("storageos_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
-
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/storageos")
-	if err != nil {
-		t.Errorf("Can't find the plugin by name")
-	}
-
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.(*storageosPlugin).newMounterInternal(spec, pod, &storageosUtil{}, &mount.FakeMounter{})
-	if err != nil {
-		t.Errorf("Failed to make a new Mounter: %v", err)
-	}
-	if mounter == nil {
-		t.Error("Got a nil Mounter")
-	}
-	volumePath := mounter.GetPath()
-	t.Logf("volumePath: %s", volumePath)
-
-	path := mounter.GetPath()
-	t.Logf("path: %s", path)
-	expectedPath := fmt.Sprintf("%s/plugins/kubernetes.io~storageos/vol1", tmpDir)
-	if path != expectedPath {
-		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, path)
-	}
-	if err := mounter.SetUp(nil); err != nil {
-		t.Errorf("Expected success, got: %v", err)
-	}
-	if _, err := os.Stat(volumePath); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("SetUp() failed, volume path not created: %s", volumePath)
-		} else {
-			t.Errorf("SetUp() failed: %v", err)
-		}
-	}
-	unmounter, err := plug.(*storageosPlugin).newUnmounterInternal("vol1", types.UID("poduid"), &storageosUtil{}, &mount.FakeMounter{})
-	if err != nil {
-		t.Errorf("Failed to make a new Unmounter: %v", err)
-	}
-	if unmounter == nil {
-		t.Error("Got a nil Unmounter")
-	}
-	if err := unmounter.TearDown(); err != nil {
-		t.Errorf("Expected success, got: %v", err)
-	}
-	if _, err := os.Stat(volumePath); err == nil {
-		t.Errorf("TearDown() failed, volume path still exists: %s", volumePath)
-	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
-	}
-}
-
-func TestPluginVolume(t *testing.T) {
-	vol := &v1.Volume{
-		Name: "vol1",
-		VolumeSource: v1.VolumeSource{
-			StorageOS: &v1.StorageOSVolumeSource{VolumeID: "base64hash", ReadOnly: false},
-		},
-	}
-	doTestPlugin(t, volume.NewSpecFromVolume(vol))
-}
-
-func TestPluginPersistentVolume(t *testing.T) {
-	vol := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
-			Name: "vol1",
-		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				StorageOS: &v1.StorageOSVolumeSource{VolumeID: "base64hash", ReadOnly: false},
-			},
-		},
-	}
-
-	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false))
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {

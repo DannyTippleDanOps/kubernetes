@@ -34,16 +34,24 @@ import (
 )
 
 const (
-	volumePath  = "/storageos/volumes"
+	volumePath  = "/var/lib/storageos/volumes"
 	losetupPath = "losetup"
 
 	optionFSType    = "kubernetes.io/fsType"
 	optionReadWrite = "kubernetes.io/readwrite"
 	optionKeySecret = "kubernetes.io/secret"
 
-	ErrDeviceNotFound = "device not found"
-	ErrNotAvailable   = "not available"
+	modeBlock deviceType = iota
+	modeFile
+	modeUnsupported
+
+	ErrDeviceNotFound     = "device not found"
+	ErrDeviceNotCreated   = "device not created"
+	ErrDeviceNotSupported = "device not supported"
+	ErrNotAvailable       = "not available"
 )
+
+type deviceType int
 
 // storageosUtil is the utility structure to setup and teardown devices from
 // the host.
@@ -67,63 +75,103 @@ func (u *storageosUtil) client() *storageosapi.Client {
 // /storageos/volumes.
 func (u *storageosUtil) create(p *storageosProvisioner) (string, int, map[string]string, error) {
 
+	var labels = make(map[string]string)
+
 	namespace := p.options.PVC.Namespace
 	if namespace == "" {
 		namespace = defaultNamespace
 	}
 
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	requestBytes := capacity.Value()
-	requestGB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
+	requestGB := int(volume.RoundUpSize(capacity.Value(), 1024*1024*1024))
+	for k, v := range p.options.PVC.Labels {
+		labels[k] = v
+	}
 
-	opts := storageostypes.CreateVolumeOptions{
+	// Encourage the StorageOS scheduler to place data locally.
+	hostname := p.plugin.host.GetHostName()
+	glog.V(2).Infof("storageos: p.plugin.host.GetHostName() = %s, %s", p.plugin.host.GetHostName(), hostname)
+	if _, ok := labels["storageos.hint.master"]; !ok {
+		labels["storageos.hint.master"] = p.plugin.host.GetHostName()
+	}
+	// TODO: should not be required
+	labels["storageos.driver"] = "filesystem"
+
+	opts := storageostypes.VolumeCreateOptions{
 		Name:        p.options.PVName,
-		Description: namespace,
+		Description: "Kubernetes volume",
 		Size:        requestGB,
 		Pool:        defaultPool,
+		Namespace:   namespace,
+		Labels:      labels,
 	}
 
 	glog.V(4).Infof("storageos: create opts: %#v", opts)
 
 	// fetch the volName details from the StorageOS API
-	vol, err := u.client().CreateVolume(opts)
+	vol, err := u.client().VolumeCreate(opts)
 	if err != nil {
-		// TODO: return better error for Not found
-		return "", 0, nil, err
+		glog.Errorf("volume create failed for volume %q (%v)", opts.Name, err)
 	}
-	return vol.ID, requestGB, vol.Labels, nil
+	// vol, err := u.client().Volume(namespace, volID)
+	// if err != nil {
+	// 	// TODO: return better error for Not found
+	// 	glog.Warningf("volume retrieve failed for volume %q with id %q (%v)", opts.Name, volID, err)
+	// 	// return "", 0, nil, err
+	// }
+
+	// Append/modify requested labels.  StorageOS labels will be prefixed with
+	// storageos.com.<key>
+	// volLabels := make(map[string]string)
+	// if vol != nil && vol.Labels != nil {
+	// 	volLabels = vol.Labels
+	// }
+	// return vol.ID, requestGB, volLabels, nil
+	return vol.ID, requestGB, labels, nil
 }
 
-// Attach exposes a volume on the host.  StorageOS uses a global namespace, so
-// if the volume exists, it should already be available as a file device within
-// /storageos/volumes.  Attach creates a loop device and returns the path to it.
+// Attach exposes a volume on the host as a block device.  StorageOS uses a
+// global namespace, so if the volume exists, it should already be available as
+// a device within `/var/lib/storageos/volumes/<id>`.
+//
+// Depending on the host capabilities, the device may be either a block device
+// or a file device.  Block devices can be used directly, but file devices must
+// be made accessible as a block device before using.
 func (u *storageosUtil) attach(b *storageosMounter) (string, error) {
-	// fetch the volName details from the StorageOS API
-	vol, err := u.client().GetVolume(b.volName)
-	if err != nil {
-		// TODO: return better error for Not found
-		return "", err
-	}
-	fileDevicePath := path.Join(volumePath, vol.ID)
-	blockDevicePath, err := getTargetLoopDevPath(fileDevicePath)
-	if err != nil && err.Error() != ErrDeviceNotFound {
-		return "", err
+
+	// TODO: Add param for namespace
+	namespace := b.podNamespace
+	if namespace == "" {
+		namespace = defaultNamespace
 	}
 
-	// If no existing loop device for the volume, create one
-	if blockDevicePath == "" {
-		glog.V(4).Infof("Creating device for volume: %s", b.volName)
-		blockDevicePath, err = makeLoopDev(fileDevicePath)
-		if err != nil {
-			return "", err
-		}
+	// fetch the volName details from the StorageOS API
+	vol, err := u.client().Volume(namespace, b.volName)
+	if err != nil {
+		glog.Warningf("volume retrieve failed for volume %q with id %q (%v)", b.volName, b.volID, err)
+		return "", err
 	}
-	return blockDevicePath, nil
+	srcPath := path.Join(volumePath, vol.ID)
+	dt, err := pathDeviceType(srcPath)
+	if err != nil {
+		glog.Warningf("volume source path %q for volume %q not ready (%v)", srcPath, b.volName, err)
+		return "", err
+	}
+	switch dt {
+	case modeBlock:
+		return srcPath, nil
+	case modeFile:
+		return attachFileDevice(srcPath)
+	default:
+		return "", fmt.Errorf(ErrDeviceNotSupported)
+	}
 }
 
 // Detach detaches a volume from the host.
 func (u *storageosUtil) detach(b *storageosUnmounter, loopDevice string) error {
-	return removeLoopDev(loopDevice)
+
+	glog.V(2).Infof("storageos: detaching loopDevice %s", loopDevice)
+	return removeLoopDevice(loopDevice)
 }
 
 // Mount mounts the volume on the host.
@@ -165,12 +213,78 @@ func (u *storageosUtil) unmount(b *storageosUnmounter, mountPath string) error {
 
 // Deletes a StorageOS volume.  Assumes it has already been unmounted and detached.
 func (u *storageosUtil) delete(d *storageosDeleter) error {
-	return nil
+	// TODO: Add param for namespace on storageos
+	namespace := d.podNamespace
+	if namespace == "" {
+		namespace = defaultNamespace
+	}
+	return u.client().VolumeDelete(namespace, d.volName)
 }
 
-// Returns the full path to the loop device associated with the given file target.
-func getTargetLoopDevPath(target string) (string, error) {
-	_, err := os.Stat(target)
+// // pathDeviceType returns
+// func pathDeviceType(path string) (deviceType, error) {
+// 	mode, err := pathMode(path)
+// 	if err != nil {
+// 		return modeUnsupported, err
+// 	}
+// 	switch {
+// 	case isDevice(mode):
+// 		return modeBlock, nil
+// 	case isFile(mode):
+// 		return modeFile, nil
+// 	default:
+// 		return modeUnsupported, nil
+// 	}
+// }
+
+// pathMode returns the FileMode for a path.
+func pathDeviceType(path string) (deviceType, error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return modeUnsupported, err
+	}
+	switch mode := fi.Mode(); {
+	case mode&os.ModeDevice != 0:
+		return modeBlock, nil
+	case mode.IsRegular():
+		return modeFile, nil
+	default:
+		return modeUnsupported, nil
+	}
+}
+
+// // isDevice returns true if the file mode is a device.
+// func isDevice(m os.FileMode) bool {
+// 	return m&os.ModeDevice != 0
+// }
+//
+// // isFile returns true if the file mode is a regular file.
+// func isFile(m os.FileMode) bool {
+// 	return m.IsRegular()
+// }
+
+// attachFileDevice takes a path to a regular file and makes it available as an
+// attached block device.
+func attachFileDevice(path string) (string, error) {
+	blockDevicePath, err := getLoopDevice(path)
+	if err != nil && err.Error() != ErrDeviceNotFound {
+		return "", err
+	}
+
+	// If no existing loop device for the path, create one
+	if blockDevicePath == "" {
+		glog.V(4).Infof("Creating device for path: %s", path)
+		blockDevicePath, err = makeLoopDevice(path)
+		if err != nil {
+			return "", err
+		}
+	}
+	return blockDevicePath, nil
+}
+
+// Returns the full path to the loop device associated with the given path.
+func getLoopDevice(path string) (string, error) {
+	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		return "", errors.New(ErrNotAvailable)
 	}
@@ -179,27 +293,27 @@ func getTargetLoopDevPath(target string) (string, error) {
 	}
 
 	exec := exec.New()
-	args := []string{"-j", target}
+	args := []string{"-j", path}
 	out, err := exec.Command(losetupPath, args...).CombinedOutput()
 	if err != nil {
-		glog.V(2).Infof("Failed device discover command for path %s: %v", target, err)
+		glog.V(2).Infof("Failed device discover command for path %s: %v", path, err)
 		return "", err
 	}
 	return parseLosetupOutputForDevice(out)
 }
 
-func makeLoopDev(pathname string) (string, error) {
+func makeLoopDevice(path string) (string, error) {
 	exec := exec.New()
-	args := []string{"-f", "--show", pathname}
+	args := []string{"-f", "--show", path}
 	out, err := exec.Command(losetupPath, args...).CombinedOutput()
 	if err != nil {
-		glog.V(2).Infof("Failed device create command for path %s: %v", pathname, err)
+		glog.V(2).Infof("Failed device create command for path %s: %v", path, err)
 		return "", err
 	}
 	return parseLosetupOutputForDevice(out)
 }
 
-func removeLoopDev(device string) error {
+func removeLoopDevice(device string) error {
 	exec := exec.New()
 	args := []string{"-d", device}
 	_, err := exec.Command(losetupPath, args...).CombinedOutput()
@@ -215,7 +329,7 @@ func parseLosetupOutputForDevice(output []byte) (string, error) {
 	}
 
 	// losetup returns device in the format:
-	// /dev/loop1: [0073]:148662 (/storageos/volumes/308f14af-cf0a-08ff-c9c3-b48104318e05)
+	// /dev/loop1: [0073]:148662 (/var/lib/storageos/volumes/308f14af-cf0a-08ff-c9c3-b48104318e05)
 	device := strings.TrimSpace(strings.SplitN(string(output), ":", 2)[0])
 	if len(device) == 0 {
 		return "", errors.New(ErrDeviceNotFound)

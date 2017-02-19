@@ -8115,9 +8115,9 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			SchemaProps: spec.SchemaProps{
 				Description: "Represents a StorageOS persistent volume resource.",
 				Properties: map[string]spec.Schema{
-					"volumeRef": {
+					"volumeID": {
 						SchemaProps: spec.SchemaProps{
-							Description: "VolumeRef is a string that references a StorageOS volume by UUID or name.",
+							Description: "VolumeID is a string that references a StorageOS volume by id.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -8136,8 +8136,22 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
+					"options": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Optional: Extra volume options if any.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
 				},
-				Required: []string{"volumeRef"},
+				Required: []string{"volumeID"},
 			},
 		},
 		Dependencies: []string{},

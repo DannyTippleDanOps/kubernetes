@@ -16069,17 +16069,17 @@ func (x *StorageOSVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 				_ = yym1127
 				if false {
 				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.VolumeName))
+					r.EncodeString(codecSelferC_UTF81234, string(x.VolumeID))
 				}
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("volumeRef"))
+				r.EncodeString(codecSelferC_UTF81234, string("volumeID"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
 				yym1128 := z.EncBinary()
 				_ = yym1128
 				if false {
 				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.VolumeName))
+					r.EncodeString(codecSelferC_UTF81234, string(x.VolumeID))
 				}
 			}
 			if yyr1125 || yy2arr1125 {
@@ -16226,11 +16226,11 @@ func (x *StorageOSVolumeSource) codecDecodeSelfFromMap(l int, d *codec1978.Decod
 		yys1140 := string(yys1140Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
 		switch yys1140 {
-		case "volumeRef":
+		case "volumeID":
 			if r.TryDecodeAsNil() {
-				x.VolumeName = ""
+				x.VolumeID = ""
 			} else {
-				x.VolumeName = string(r.DecodeString())
+				x.VolumeID = string(r.DecodeString())
 			}
 		case "fsType":
 			if r.TryDecodeAsNil() {
@@ -16282,9 +16282,9 @@ func (x *StorageOSVolumeSource) codecDecodeSelfFromArray(l int, d *codec1978.Dec
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.VolumeName = ""
+		x.VolumeID = ""
 	} else {
-		x.VolumeName = string(r.DecodeString())
+		x.VolumeID = string(r.DecodeString())
 	}
 	yyj1146++
 	if yyhl1146 {

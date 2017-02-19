@@ -3385,8 +3385,8 @@ message ServiceStatus {
 
 // Represents a StorageOS persistent volume resource.
 message StorageOSVolumeSource {
-  // VolumeName is a string that references a StorageOS volume by name.
-  optional string volumeRef = 1;
+  // VolumeID is a string that references a StorageOS volume by id.
+  optional string volumeID = 1;
 
   // Filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
