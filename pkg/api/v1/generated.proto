@@ -3385,23 +3385,37 @@ message ServiceStatus {
 
 // Represents a StorageOS persistent volume resource.
 message StorageOSVolumeSource {
-  // VolumeID is a string that references a StorageOS volume by id.
-  optional string volumeID = 1;
+  // VolumeName is the human-readable name of the StorageOS volume.  Volume
+  // names are only unique within a namespace.
+  optional string volumeName = 1;
+
+  // Namespace specifies the scope of the volume name within StorageOS.  If no
+  // Namespace is specified, the namespace of the pod will be used.  Set to
+  // "default", if you are not using namespaces within StorageOS.
+  // +optional
+  optional string namespace = 2;
+
+  // The name of the storage pool to provision from.  Pools can have different
+  // capacity and performance characteristics depending on the underlying
+  // storage resources used in them.  If not specified, the default pool will be
+  // used.
+  // +optional
+  optional string pool = 3;
 
   // Filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // +optional
-  optional string fsType = 2;
+  optional string fsType = 4;
 
   // Defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // +optional
-  optional bool readOnly = 3;
+  optional bool readOnly = 5;
 
   // Optional: Extra volume options if any.
   // +optional
-  map<string, string> options = 4;
+  map<string, string> options = 6;
 }
 
 message Sysctl {

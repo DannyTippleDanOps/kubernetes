@@ -863,8 +863,8 @@ func validatePhotonPersistentDiskVolumeSource(cd *api.PhotonPersistentDiskVolume
 
 func validateStorageOSVolumeSource(storageos *api.StorageOSVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(storageos.VolumeID) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("volumeID"), ""))
+	if len(storageos.VolumeName) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("volumeName"), ""))
 	}
 	return allErrs
 }

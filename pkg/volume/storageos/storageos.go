@@ -86,7 +86,7 @@ func (plugin *storageosPlugin) GetVolumeName(spec *volume.Spec) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	return volumeSource.VolumeID, nil
+	return volumeSource.VolumeName, nil
 }
 
 func (plugin *storageosPlugin) CanSupport(spec *volume.Spec) bool {
@@ -252,7 +252,6 @@ type storageos struct {
 	podName      string
 	// Name of the PV, not the StorageOS volume.
 	pvName    string
-	volID     string
 	volName   string
 	namespace string
 	pool      string
@@ -274,7 +273,7 @@ var _ volume.Mounter = &storageosMounter{}
 
 func (b *storageosMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.reamdOnly,
+		ReadOnly:        b.readOnly,
 		Managed:         !b.readOnly,
 		SupportsSELinux: true,
 	}
@@ -528,7 +527,6 @@ func (v *storageosProvisioner) Provision() (*v1.PersistentVolume, error) {
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				StorageOS: &v1.StorageOSVolumeSource{
-					VolumeID:   vol.ID,
 					VolumeName: vol.Name,
 					Namespace:  vol.Namespace,
 					Pool:       vol.Pool,

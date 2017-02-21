@@ -1074,20 +1074,32 @@ type AzureDiskVolumeSource struct {
 
 // Represents a StorageOS persistent volume resource.
 type StorageOSVolumeSource struct {
-	// VolumeID is a string that references a StorageOS volume by id.
-	VolumeID string `json:"volumeID" protobuf:"bytes,1,opt,name=volumeID"`
+	// VolumeName is the human-readable name of the StorageOS volume.  Volume
+	// names are only unique within a namespace.
+	VolumeName string `json:"volumeName,omitempty" protobuf:"bytes,1,opt,name=volumeName"`
+	// Namespace specifies the scope of the volume name within StorageOS.  If no
+	// Namespace is specified, the namespace of the pod will be used.  Set to
+	// "default", if you are not using namespaces within StorageOS.
+	// +optional
+	Namespace string `json:"namespace,omitempty" protobuf:"bytes,2,opt,name=namespace"`
+	// The name of the storage pool to provision from.  Pools can have different
+	// capacity and performance characteristics depending on the underlying
+	// storage resources used in them.  If not specified, the default pool will be
+	// used.
+	// +optional
+	Pool string `json:"pool,omitempty" protobuf:"bytes,3,opt,name=pool"`
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// +optional
-	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,4,opt,name=fsType"`
 	// Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
-	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,5,opt,name=readOnly"`
 	// Optional: Extra volume options if any.
 	// +optional
-	Options map[string]string `json:"options,omitempty" protobuf:"bytes,4,rep,name=options"`
+	Options map[string]string `json:"options,omitempty" protobuf:"bytes,6,rep,name=options"`
 }
 
 // Adapts a ConfigMap into a volume.

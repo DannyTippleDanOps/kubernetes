@@ -8115,9 +8115,23 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			SchemaProps: spec.SchemaProps{
 				Description: "Represents a StorageOS persistent volume resource.",
 				Properties: map[string]spec.Schema{
-					"volumeID": {
+					"volumeName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "VolumeID is a string that references a StorageOS volume by id.",
+							Description: "VolumeName is the human-readable name of the StorageOS volume.  Volume names are only unique within a namespace.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"namespace": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Namespace specifies the scope of the volume name within StorageOS.  If no Namespace is specified, the namespace of the pod will be used.  Set to \"default\", if you are not using namespaces within StorageOS.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"pool": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The name of the storage pool to provision from.  Pools can have different capacity and performance characteristics depending on the underlying storage resources used in them.  If not specified, the default pool will be used.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -8151,7 +8165,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
-				Required: []string{"volumeID"},
 			},
 		},
 		Dependencies: []string{},

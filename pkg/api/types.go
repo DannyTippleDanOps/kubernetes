@@ -986,8 +986,20 @@ type AzureDiskVolumeSource struct {
 
 // Represents a StorageOS persistent volume resource.
 type StorageOSVolumeSource struct {
-	// VolumeID is a string that references the StorageOS volume.
-	VolumeID string
+	// VolumeName is the human-readable name of the StorageOS volume.  Volume
+	// names are only unique within a namespace.
+	VolumeName string
+	// Namespace specifies the scope of the volume name within StorageOS.  If no
+	// Namespace is specified, the namespace of the pod will be used.  Set to
+	// "default", if you are not using namespaces within StorageOS.
+	// +optional
+	Namespace string
+	// The name of the storage pool to provision from.  Pools can have different
+	// capacity and performance characteristics depending on the underlying
+	// storage resources used in them.  If not specified, the default pool will be
+	// used.
+	// +optional
+	Pool string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.

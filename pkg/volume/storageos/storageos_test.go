@@ -87,7 +87,6 @@ func (fake *fakePDManager) CreateVolume(p *storageosProvisioner) (*storageosVolu
 	labels := make(map[string]string)
 	labels["fakepdmanager"] = "yes"
 	return &storageosVolume{
-		ID:        "test-storageos-uuid",
 		Name:      "test-storageos-name",
 		Namespace: "test-storageos-namespace",
 		Pool:      "test-storageos-pool",
@@ -120,8 +119,8 @@ func (fake *fakePDManager) UnmountVolume(b *storageosUnmounter) error {
 
 func (fake *fakePDManager) DeleteVolume(d *storageosDeleter) error {
 	fake.deleteCalled = true
-	if d.volID != "test-storageos-uuid" {
-		return fmt.Errorf("Deleter got unexpected volume id: %s", d.volID)
+	if d.volName != "test-storageos-name" {
+		return fmt.Errorf("Deleter got unexpected volume name: %s", d.volName)
 	}
 	return nil
 }
@@ -143,7 +142,6 @@ func TestPlugin(t *testing.T) {
 		Name: "vol1-pvname",
 		VolumeSource: v1.VolumeSource{
 			StorageOS: &v1.StorageOSVolumeSource{
-				VolumeID:   "base64hash",
 				VolumeName: "vol1",
 				Namespace:  "ns1",
 				FSType:     "ext3",
@@ -232,9 +230,6 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Provision() failed: %v", err)
 	}
 
-	if persistentSpec.Spec.PersistentVolumeSource.StorageOS.VolumeID != "test-storageos-uuid" {
-		t.Errorf("Provision() returned unexpected volume ID: %s", persistentSpec.Spec.PersistentVolumeSource.StorageOS.VolumeID)
-	}
 	if persistentSpec.Spec.PersistentVolumeSource.StorageOS.VolumeName != "test-storageos-name" {
 		t.Errorf("Provision() returned unexpected volume Name: %s", persistentSpec.Spec.PersistentVolumeSource.StorageOS.VolumeName)
 	}
@@ -300,7 +295,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				StorageOS: &v1.StorageOSVolumeSource{VolumeID: "base64hash", Namespace: "vnsA", ReadOnly: false},
+				StorageOS: &v1.StorageOSVolumeSource{VolumeName: "pvA", Namespace: "vnsA", ReadOnly: false},
 			},
 			ClaimRef: &v1.ObjectReference{
 				Name: "claimA",

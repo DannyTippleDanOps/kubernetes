@@ -4184,7 +4184,9 @@ func Convert_api_ServiceStatus_To_v1_ServiceStatus(in *api.ServiceStatus, out *S
 }
 
 func autoConvert_v1_StorageOSVolumeSource_To_api_StorageOSVolumeSource(in *StorageOSVolumeSource, out *api.StorageOSVolumeSource, s conversion.Scope) error {
-	out.VolumeID = in.VolumeID
+	out.VolumeName = in.VolumeName
+	out.Namespace = in.Namespace
+	out.Pool = in.Pool
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
 	out.Options = *(*map[string]string)(unsafe.Pointer(&in.Options))
@@ -4196,7 +4198,9 @@ func Convert_v1_StorageOSVolumeSource_To_api_StorageOSVolumeSource(in *StorageOS
 }
 
 func autoConvert_api_StorageOSVolumeSource_To_v1_StorageOSVolumeSource(in *api.StorageOSVolumeSource, out *StorageOSVolumeSource, s conversion.Scope) error {
-	out.VolumeID = in.VolumeID
+	out.VolumeName = in.VolumeName
+	out.Namespace = in.Namespace
+	out.Pool = in.Pool
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
 	out.Options = *(*map[string]string)(unsafe.Pointer(&in.Options))

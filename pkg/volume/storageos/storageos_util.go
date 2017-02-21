@@ -136,24 +136,6 @@ func (u *storageosUtil) AttachVolume(b *storageosMounter) (string, error) {
 		fmt.Printf("XXX PANIC: AttachVolume: namespace: %s, volName: %s\n", b.namespace, b.volName)
 	}
 
-	// var namespace string
-	// switch {
-	// case b.namespace != "":
-	// 	namespace = b.namespace
-	// case b.podNamespace != "":
-	// 	namespace = b.podNamespace
-	// default:
-	// 	namespace = defaultNamespace
-	// }
-	//
-	// ref := b.volName
-	// if b.volID != "" {
-	// 	ref = b.volID
-	// }
-
-	// fmt.Printf("XXX: attach namespace: %s\n", namespace)
-	// fmt.Printf("XXX: attach ref: %s\n", ref)
-
 	// fetch the volID from the StorageOS API
 	vol, err := u.client().Volume(b.namespace, b.volName)
 	if err != nil {
@@ -243,24 +225,6 @@ func (u *storageosUtil) MountVolume(b *storageosMounter, mntDevice, deviceMountP
 	}
 	fmt.Printf("XXX: MountVolume: done, updating kv\n")
 
-	// var namespace string
-	// switch {
-	// case b.namespace != "":
-	// 	namespace = b.namespace
-	// case b.podNamespace != "":
-	// 	namespace = b.podNamespace
-	// default:
-	// 	namespace = defaultNamespace
-	// }
-	//
-	// ref := b.volName
-	// if b.volID != "" {
-	// 	ref = b.volID
-	// }
-
-	// fmt.Printf("XXX: mount namespace: %s\n", namespace)
-	// fmt.Printf("XXX: mount ref: %s\n", ref)
-
 	opts := storageostypes.VolumeMountOptions{
 		Name:      b.volName,
 		Namespace: b.namespace,
@@ -292,41 +256,8 @@ func (u *storageosUtil) DeleteVolume(d *storageosDeleter) error {
 	if d.namespace == "" || d.volName == "" {
 		fmt.Printf("XXX PANIC: DeleteVolume: namespace: %s, volName: %s\n", d.namespace, d.volName)
 	}
-
-	// namespace := defaultNamespace
-	// if d.namespace != "" {
-	// 	namespace = d.namespace
-	// }
-	// var ref string
-	// switch {
-	// case d.volID != "":
-	// 	ref = d.volID
-	// case d.volName != "":
-	// 	ref = d.volName
-	// case d.pvName != "":
-	// 	ref = d.pvName
-	// default:
-	// 	return fmt.Errorf(ErrNoNoRef)
-	// }
-
 	return u.client().VolumeDelete(d.namespace, d.volName)
 }
-
-// // pathDeviceType returns
-// func pathDeviceType(path string) (deviceType, error) {
-// 	mode, err := pathMode(path)
-// 	if err != nil {
-// 		return modeUnsupported, err
-// 	}
-// 	switch {
-// 	case isDevice(mode):
-// 		return modeBlock, nil
-// 	case isFile(mode):
-// 		return modeFile, nil
-// 	default:
-// 		return modeUnsupported, nil
-// 	}
-// }
 
 // pathMode returns the FileMode for a path.
 func pathDeviceType(path string) (deviceType, error) {
@@ -343,16 +274,6 @@ func pathDeviceType(path string) (deviceType, error) {
 		return modeUnsupported, nil
 	}
 }
-
-// // isDevice returns true if the file mode is a device.
-// func isDevice(m os.FileMode) bool {
-// 	return m&os.ModeDevice != 0
-// }
-//
-// // isFile returns true if the file mode is a regular file.
-// func isFile(m os.FileMode) bool {
-// 	return m.IsRegular()
-// }
 
 // attachFileDevice takes a path to a regular file and makes it available as an
 // attached block device.
