@@ -390,7 +390,6 @@ func getVolumeInfo(pvName string, podUID types.UID, host volume.VolumeHost) (str
 	for _, f := range files {
 		if f.Mode().IsDir() && strings.HasSuffix(f.Name(), "~"+pvName) {
 			if namespace, volName, err := getVolumeFromRef(f.Name()); err == nil {
-				fmt.Printf("XXX: getVolumeInfo FOUND IN VOL DIR: %s\n", f.Name())
 				return namespace, volName, nil
 			}
 		}
@@ -424,7 +423,6 @@ func (b *storageosUnmounter) GetPath() string {
 // resource was the last reference to that disk on the kubelet.
 func (b *storageosUnmounter) TearDown() error {
 
-	fmt.Printf("XXX: TearDown: b: %#v\n", b)
 	if len(b.namespace) == 0 || len(b.volName) == 0 {
 		return nil
 	}
@@ -469,7 +467,6 @@ func (b *storageosUnmounter) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (b *storageosUnmounter) TearDownAt(dir string) error {
-	// fmt.Printf("XXX: TearDownAt: dir: %s\n", dir)
 	if err := util.UnmountPath(dir, b.mounter); err != nil {
 		glog.V(4).Infof("Unmounted StorageOS volume %s failed with: %v", b.pvName, err)
 	}
@@ -486,7 +483,6 @@ type storageosDeleter struct {
 var _ volume.Deleter = &storageosDeleter{}
 
 func (d *storageosDeleter) GetPath() string {
-	// fmt.Printf("XXX: Deleter.GetPath(%s, %s, %s, %s, %s)\n", d.podUID, d.namespace, d.volName, d.pvName, d.plugin.host)
 	return getPath(d.podUID, d.namespace, d.volName, d.pvName, d.plugin.host)
 }
 
