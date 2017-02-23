@@ -8,6 +8,7 @@
       - [Persistent Volumes](#persistent-volumes)
     - [Dynamic Provisioning](#dynamic-provisioning)
       - [Storage Class](#storage-class)
+  - [API Configuration](#api-configuration)
 
 ## StorageOS
 
@@ -73,6 +74,7 @@ Pods can be created that access volumes directly.
            # The filesystem type to format the volume with, if required.
            fsType: ext3
    ```
+
    [Download example](storageos-pod.yaml?raw=true)
 
    Create the pod:
@@ -117,6 +119,7 @@ Pods can be created that access volumes directly.
        # The filesystem type to create on the volume, if required.
        fsType: ext4
    ```
+
    [Download example](storageos-pv.yaml?raw=true)
 
    Create the persistent volume:
@@ -129,22 +132,22 @@ Pods can be created that access volumes directly.
 
    ```bash
    $ kubectl describe pv pv0001
-   Name:		pv0001
-   Labels:		<none>
+   Name:           pv0001
+   Labels:         <none>
    StorageClass:
-   Status:		Available
+   Status:         Available
    Claim:
-   Reclaim Policy:	Recycle
-   Access Modes:	RWO
-   Capacity:	5Gi
+   Reclaim Policy: Recycle
+   Access Modes:   RWO
+   Capacity:       5Gi
    Message:
    Source:
-       Type:	StorageOS (a StorageOS Persistent Disk resource)
-       VolumeName:	pv0001
-       Namespace:	default
+       Type:       StorageOS (a StorageOS Persistent Disk resource)
+       VolumeName: pv0001
+       Namespace:  default
        Pool:
-       FSType:	ext4
-       ReadOnly:	false
+       FSType:     ext4
+       ReadOnly:   false
    No events.
    ```
 
@@ -164,6 +167,7 @@ Pods can be created that access volumes directly.
        requests:
          storage: 5Gi
    ```
+
    [Download example](storageos-pvc.yaml?raw=true)
 
    Create the persistent volume claim:
@@ -176,14 +180,14 @@ Pods can be created that access volumes directly.
 
    ```bash
    $ kubectl describe pvc pvc0001
-   Name:		pvc0001
-   Namespace:	default
+   Name:          pvc0001
+   Namespace:     default
    StorageClass:
-   Status:		Bound
-   Volume:		pv0001
-   Labels:		<none>
-   Capacity:	5Gi
-   Access Modes:	RWO
+   Status:        Bound
+   Volume:        pv0001
+   Labels:        <none>
+   Capacity:      5Gi
+   Access Modes:  RWO
    No events.
    ```
 
@@ -219,6 +223,7 @@ Pods can be created that access volumes directly.
          persistentVolumeClaim:
            claimName: pvc0001
    ```
+
    [Download example](storageos-pvcpod.yaml?raw=true)
 
    Create the pod:
@@ -245,7 +250,9 @@ Kubernetes administrators can use storage classes to define different types of s
 
 StorageOS supports the following storage class parameters:
 
-*  `apiAddress`:   api address
+*  `pool`: The name of the StorageOS distributed capacity pool to provision the volume from.  Uses the `default` pool which is normally present if not specified.
+*  `description`: The description to assign to volumes that were created dynamically.  All volume descriptions will be the same for the storage class, but different storage classes can be used to allow descriptions for different use cases.  Defaults to `Kubernetes volume`.
+* `fsType`: The default filesystem type to request.  Note that user-defined rules within StorageOS may override this value.  Defaults to `ext4`.
 
 1. Create storage class
 
@@ -258,10 +265,11 @@ StorageOS supports the following storage class parameters:
      name: fast
    provisioner: kubernetes.io/storageos
    parameters:
-     apiAddress: tcp://localhost:8000
-     apiUser: storageos
-     apiPassword: storageos
+     pool: default
+     description: Kubernetes volume
+     fsType: ext4
    ```
+
    [Download example](storageos-sc.yaml?raw=true)
 
    Create the storage class:
@@ -274,11 +282,11 @@ StorageOS supports the following storage class parameters:
 
    ```bash
    $ kubectl describe storageclass fast
-   Name:		fast
-   IsDefaultClass:	No
-   Annotations:	<none>
-   Provisioner:	kubernetes.io/storageos
-   Parameters:	apiAddress=tcp://localhost:8000,apiPassword=storageos,apiUser=storageos
+   Name:           fast
+   IsDefaultClass: No
+   Annotations:    <none>
+   Provisioner:    kubernetes.io/storageos
+   Parameters:     description=Kubernetes volume,fsType=ext4,pool=default
    No events.
    ```
 
@@ -310,15 +318,15 @@ StorageOS supports the following storage class parameters:
    Verify the pvc has been created:
 
    ```bash
-   # kubectl describe pvc fast0001
-   Name:		fast0001
-   Namespace:	default
-   StorageClass:	fast
-   Status:		Bound
-   Volume:		pvc-480952e7-f8e0-11e6-af8c-08002736b526
-   Labels:		<none>
-   Capacity:	5Gi
-   Access Modes:	RWO
+   $ kubectl describe pvc fast0001
+   Name:         fast0001
+   Namespace:    default
+   StorageClass: fast
+   Status:       Bound
+   Volume:       pvc-480952e7-f8e0-11e6-af8c-08002736b526
+   Labels:       <none>
+   Capacity:     5Gi
+   Access Modes: RWO
    Events:
      <snip>
    ```
@@ -327,22 +335,22 @@ StorageOS supports the following storage class parameters:
 
    ```bash
    $ kubectl describe pv pvc-480952e7-f8e0-11e6-af8c-08002736b526
-   Name:		pvc-480952e7-f8e0-11e6-af8c-08002736b526
-   Labels:		storageos.driver=filesystem
-   StorageClass:	fast
-   Status:		Bound
-   Claim:		default/fast0001
-   Reclaim Policy:	Delete
-   Access Modes:	RWO
-   Capacity:	5Gi
+   Name:            pvc-480952e7-f8e0-11e6-af8c-08002736b526
+   Labels:          storageos.driver=filesystem
+   StorageClass:    fast
+   Status:          Bound
+   Claim:           default/fast0001
+   Reclaim Policy:  Delete
+   Access Modes:    RWO
+   Capacity:        5Gi
    Message:
    Source:
-       Type:	StorageOS (a StorageOS Persistent Disk resource)
-       VolumeName:	pvc-480952e7-f8e0-11e6-af8c-08002736b526
-       Namespace:	default
-       Pool:	default
-       FSType:	ext4
-       ReadOnly:	false
+       Type:        StorageOS (a StorageOS Persistent Disk resource)
+       VolumeName:  pvc-480952e7-f8e0-11e6-af8c-08002736b526
+       Namespace:   default
+       Pool:        default
+       FSType:      ext4
+       ReadOnly:    false
    No events.
    ```
 
@@ -378,6 +386,7 @@ StorageOS supports the following storage class parameters:
          persistentVolumeClaim:
            claimName: fast0001
    ```
+
    [Download example](storageos-sc-pvcpod.yaml?raw=true)
 
    Create the pod:
@@ -393,6 +402,60 @@ StorageOS supports the following storage class parameters:
    NAME                          READY     STATUS    RESTARTS   AGE
    test-storageos-redis-sc-pvc   1/1       Running   0          44s
    ```
+
+## API Configuration
+
+The StorageOS provider has been pre-configured to use the StorageOS API defaults, and no additional configuration is required for testing.  If you have changed the API port, or have removed the default account or changed its password (recommended), you must specify the new settings.  This is done using Kubernetes [Secrets](../../../docs/user-guide/secrets/).
+
+To add a secret to provide custom API configuration, you must name the secret `storageos-api`.  Normally you would add the secret in the `default` namespace so it would be available to all namespaces to use.  You may also add it to a specific namespace for only that namespace to use, allowing different namespaces to authenticate to the API with different user accounts.
+
+Example spec:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: storageos-api
+type: Opaque
+data:
+  apiAddress: dGNwOi8vMTI3LjAuMC4xOjU3MDU=
+  apiUsername: c3RvcmFnZW9z
+  apiPassword: c3RvcmFnZW9z
+```
+
+Values for `apiAddress`, `apiUsername` and `apiPassword` can be generated with:
+
+```bash
+$ echo -n "tcp://127.0.0.1:5705" | base64
+dGNwOi8vMTI3LjAuMC4xOjU3MDU=
+```
+
+Create the secret:
+
+```bash
+$ kubectl create -f storageos-secret.yaml
+secret "storageos-api" created
+```
+
+Verify the secret:
+
+```bash
+$ kubectl describe secret storageos-api
+Name:         storageos-api
+Namespace:    default
+Labels:       <none>
+Annotations:  <none>
+
+Type:	Opaque
+
+Data
+====
+apiAddress:   20 bytes
+apiPassword:  9 bytes
+apiUsername:  9 bytes
+```
+
+Note that there is one caveat to storing secrets in project namespaces - you must not set a custom namespace for the storageos volume that is different than the pod namespace.  This will not normally cause a problem as by default they will be the same.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

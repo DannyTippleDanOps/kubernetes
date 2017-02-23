@@ -4,6 +4,6 @@ metadata:
   name: fast
 provisioner: kubernetes.io/storageos
 parameters:
-  apiAddress: tcp://localhost:8000
-  apiUser: storageos
-  apiPassword: storageos
+  pool: default
+  description: Kubernetes volume
+  fsType: ext4
