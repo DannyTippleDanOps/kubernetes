@@ -990,8 +990,8 @@ type StorageOSVolumeSource struct {
 	// names are only unique within a namespace.
 	VolumeName string
 	// Namespace specifies the scope of the volume name within StorageOS.  If no
-	// Namespace is specified, the namespace of the pod will be used.  Set to
-	// "default", if you are not using namespaces within StorageOS.
+	// namespace is specified, the namespace of the pod will be used.  Set to
+	// "default" if you are not using namespaces within StorageOS.
 	// +optional
 	Namespace string
 	// The name of the storage pool to provision from.  Pools can have different

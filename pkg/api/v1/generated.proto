@@ -3390,8 +3390,8 @@ message StorageOSVolumeSource {
   optional string volumeName = 1;
 
   // Namespace specifies the scope of the volume name within StorageOS.  If no
-  // Namespace is specified, the namespace of the pod will be used.  Set to
-  // "default", if you are not using namespaces within StorageOS.
+  // namespace is specified, the namespace of the pod will be used.  Set to
+  // "default" if you are not using namespaces within StorageOS.
   // +optional
   optional string namespace = 2;
 

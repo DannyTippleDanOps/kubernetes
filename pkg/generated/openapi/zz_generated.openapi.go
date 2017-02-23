@@ -8124,7 +8124,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 					"namespace": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Namespace specifies the scope of the volume name within StorageOS.  If no Namespace is specified, the namespace of the pod will be used.  Set to \"default\", if you are not using namespaces within StorageOS.",
+							Description: "Namespace specifies the scope of the volume name within StorageOS.  If no namespace is specified, the namespace of the pod will be used.  Set to \"default\" if you are not using namespaces within StorageOS.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

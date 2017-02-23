@@ -1095,6 +1095,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"quobyte":              "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
 	"azureDisk":            "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
 	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
+	"storageos":            "StorageOS represents a StorageOS persistent disk attached and mounted on kubelet's host machine.",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1729,6 +1730,21 @@ var map_ServiceStatus = map[string]string{
 
 func (ServiceStatus) SwaggerDoc() map[string]string {
 	return map_ServiceStatus
+}
+
+var map_StorageOSVolumeSource = map[string]string{
+	"":           "Represents a StorageOS mount that lasts the lifetime of a pod.",
+	"volumeName": "VolumeName is the human-readable name of the StorageOS volume. Volume names are only unique within a namespace",
+	"namespace":  "Namespace specifies the scope of the volume name within StorageOS.  If no namespace is specified, the namespace of the pod will be used.  Set to `default` if you are not using namespaces within StorageOS.",
+	"pool":       "The name of the storage pool to provision from.  Pools can have different capacity and performance characteristics depending on the underlying storage resources used in them.  If not specified, the default pool will be used.",
+	"apiAddress": "The API server address, in URI format.  Defaults to: `tcp://127.0.0.1:5705`",
+	"secretName": "The name of the secret that contains the StorageOS API credentials.  Uses defaults if not specified.",
+	"fsType":     "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ext3\" . Implicitly inferred to be \"ext4\" if unspecified.d",
+	"readOnly":   "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+}
+
+func (StorageOSVolumeSource) SwaggerDoc() map[string]string {
+	return map_StorageOSVolumeSource
 }
 
 var map_TCPSocketAction = map[string]string{
