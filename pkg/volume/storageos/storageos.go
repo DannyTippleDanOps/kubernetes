@@ -53,15 +53,18 @@ var _ volume.ProvisionableVolumePlugin = &storageosPlugin{}
 
 const (
 	storageosPluginName = "kubernetes.io/storageos"
-	defaultAPIAddress   = "tcp://localhost:8000"
-	defaultAPIUser      = "storageos"
-	defaultAPIPassword  = "storageos"
-	defaultAPIVersion   = "1"
-	defaultFSType       = "ext4"
-	defaultSizeGB       = 1
-	defaultPool         = "default"
-	defaultNamespace    = "default"
-	checkSleepDuration  = time.Second
+	storageosDevicePath = "/var/lib/storageos/volumes"
+
+	defaultAPIAddress  = "tcp://localhost:5705"
+	defaultAPIUser     = "storageos"
+	defaultAPIPassword = "storageos"
+	defaultAPIVersion  = "1"
+	defaultFSType      = "ext4"
+	defaultSizeGB      = 1
+	defaultPool        = "default"
+	defaultNamespace   = "default"
+
+	checkSleepDuration = time.Second
 )
 
 func getPath(uid types.UID, namespace string, volName string, pvName string, host volume.VolumeHost) string {
@@ -119,6 +122,8 @@ func (plugin *storageosPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 	// unmount where only the pvName is available.
 	// pvName := source.Namespace + "~" + source.VolumeName
 
+	// fmt.Printf("XXX: mounter: source: %#v\n", source)
+
 	return &storageosMounter{
 		storageos: &storageos{
 			podUID: pod.UID,
@@ -137,6 +142,7 @@ func (plugin *storageosPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 		},
 		fsType:      source.FSType,
 		readOnly:    readOnly,
+		devicePath:  storageosDevicePath,
 		diskMounter: &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
 	}, nil
 }
@@ -251,20 +257,23 @@ type storageos struct {
 	podNamespace string
 	podName      string
 	// Name of the PV, not the StorageOS volume.
-	pvName    string
-	volName   string
-	namespace string
-	pool      string
-	manager   storageosManager
-	mounter   mount.Interface
-	plugin    *storageosPlugin
+	pvName      string
+	volName     string
+	namespace   string
+	description string
+	pool        string
+	fsType      string
+	manager     storageosManager
+	mounter     mount.Interface
+	plugin      *storageosPlugin
 	volume.MetricsProvider
 }
 
 type storageosMounter struct {
 	*storageos
-	fsType   string
-	readOnly bool
+	fsType     string
+	readOnly   bool
+	devicePath string
 	// Interface used to mount the file or block device
 	diskMounter *mount.SafeFormatAndMount
 }
@@ -498,6 +507,20 @@ type storageosProvisioner struct {
 var _ volume.Provisioner = &storageosProvisioner{}
 
 func (v *storageosProvisioner) Provision() (*v1.PersistentVolume, error) {
+
+	// Set parameters from StorageClass
+	if len(v.options.Parameters) > 0 {
+		if description, ok := v.options.Parameters["description"]; ok {
+			v.description = description
+		}
+		if pool, ok := v.options.Parameters["pool"]; ok {
+			v.pool = pool
+		}
+		if fsType, ok := v.options.Parameters["fstype"]; ok {
+			v.fsType = fsType
+		}
+	}
+
 	vol, err := v.manager.CreateVolume(v)
 	if err != nil {
 		return nil, err
