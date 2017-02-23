@@ -126,11 +126,8 @@ func (plugin *storageosPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 
 	return &storageosMounter{
 		storageos: &storageos{
-			podUID: pod.UID,
-			// podNamespace:    pod.Namespace,
-			// podName:         pod.Name,
-			pvName: spec.Name(),
-			// pvName:    pvName,
+			podUID:    pod.UID,
+			pvName:    spec.Name(),
 			volName:   source.VolumeName,
 			namespace: source.Namespace,
 			pool:      source.Pool,
@@ -253,16 +250,15 @@ type storageosManager interface {
 
 // storageos volumes represent a bare host directory mount of an StorageOS export.
 type storageos struct {
-	podUID       types.UID
-	podNamespace string
-	podName      string
-	// Name of the PV, not the StorageOS volume.
+	podUID      types.UID
 	pvName      string
 	volName     string
 	namespace   string
 	description string
 	pool        string
 	fsType      string
+	size        int
+	labels      map[string]string
 	manager     storageosManager
 	mounter     mount.Interface
 	plugin      *storageosPlugin
@@ -520,6 +516,16 @@ func (v *storageosProvisioner) Provision() (*v1.PersistentVolume, error) {
 			v.fsType = fsType
 		}
 	}
+
+	// Set from PVC
+	v.volName = v.options.PVName
+	v.namespace = v.options.PVC.Namespace
+	v.labels = make(map[string]string)
+	for k, val := range v.options.PVC.Labels {
+		v.labels[k] = val
+	}
+	capacity := v.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	v.size = int(volume.RoundUpSize(capacity.Value(), 1024*1024*1024))
 
 	vol, err := v.manager.CreateVolume(v)
 	if err != nil {

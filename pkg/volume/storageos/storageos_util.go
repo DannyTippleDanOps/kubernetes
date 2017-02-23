@@ -23,7 +23,6 @@ import (
 	"path"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/volume"
@@ -144,21 +143,17 @@ func (u *storageosUtil) client(cfg apiConfigGetter) apiImplementer {
 // Creates a new StorageOS volume and makes it available as a device within
 // /var/lib/storageos/volumes.
 func (u *storageosUtil) CreateVolume(p *storageosProvisioner) (*storageosVolume, error) {
-	var labels = make(map[string]string)
-	for k, v := range p.options.PVC.Labels {
-		labels[k] = v
+	if p.labels == nil {
+		p.labels = make(map[string]string)
 	}
-	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	requestGB := int(volume.RoundUpSize(capacity.Value(), 1024*1024*1024))
-
 	opts := storageostypes.VolumeCreateOptions{
-		Name:        p.options.PVName,
-		Size:        requestGB,
+		Name:        p.volName,
+		Size:        p.size,
 		Description: p.description,
 		Pool:        p.pool,
 		FSType:      p.fsType,
-		Namespace:   p.options.PVC.Namespace,
-		Labels:      labels,
+		Namespace:   p.namespace,
+		Labels:      p.labels,
 	}
 
 	apiCfg := &namespacedSecret{
@@ -191,8 +186,6 @@ func (u *storageosUtil) CreateVolume(p *storageosProvisioner) (*storageosVolume,
 // or a file device.  Block devices can be used directly, but file devices must
 // be made accessible as a block device before using.
 func (u *storageosUtil) AttachVolume(b *storageosMounter) (string, error) {
-
-	// fetch the volID from the StorageOS API
 	apiCfg := &namespacedSecret{
 		secretName: apiSecretName,
 		namespace:  b.namespace,
@@ -221,26 +214,17 @@ func (u *storageosUtil) AttachVolume(b *storageosMounter) (string, error) {
 
 // Detach detaches a volume from the host.
 func (u *storageosUtil) DetachVolume(b *storageosUnmounter, loopDevice string) error {
-	fmt.Printf("XXX: DetachVolume: namespace: %s, volName: %s\n", b.namespace, b.volName)
-	if b.namespace == "" || b.volName == "" {
-		fmt.Printf("XXX PANIC: DetachVolume: namespace: %s, volName: %s\n", b.namespace, b.volName)
-	}
-
-	glog.V(2).Infof("storageos: detaching loopDevice %s", loopDevice)
-	// return removeLoopDevice(loopDevice)
 	if _, err := os.Stat(loopDevice); os.IsNotExist(err) {
 		return nil
 	}
 	if err := removeLoopDevice(loopDevice); err != nil {
 		return err
 	}
-
 	opts := storageostypes.VolumeUnmountOptions{
 		Name:      b.volName,
 		Namespace: b.namespace,
 		Client:    b.plugin.host.GetHostName(),
 	}
-
 	apiCfg := &namespacedSecret{
 		secretName: apiSecretName,
 		namespace:  b.namespace,
@@ -251,15 +235,9 @@ func (u *storageosUtil) DetachVolume(b *storageosUnmounter, loopDevice string) e
 
 // Mount mounts the volume on the host.
 func (u *storageosUtil) MountVolume(b *storageosMounter, mntDevice, deviceMountPath string) error {
-	fmt.Printf("XXX: MountVolume: mntDevice: %s, deviceMountPath: %s, namespace: %s, volName: %s\n", mntDevice, deviceMountPath, b.namespace, b.volName)
-	// fmt.Printf("XXX: MountVolume: namespace: %s, volName: %s\n", b.namespace, b.volName)
-	if b.namespace == "" || b.volName == "" {
-		fmt.Printf("XXX PANIC: MountVolume: namespace: %s, volName: %s\n", b.namespace, b.volName)
-	}
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Printf("XXX: MountVolume: mkdir 1: %s\n", deviceMountPath)
 			if err = os.MkdirAll(deviceMountPath, 0750); err != nil {
 				return err
 			}
@@ -268,7 +246,6 @@ func (u *storageosUtil) MountVolume(b *storageosMounter, mntDevice, deviceMountP
 			return err
 		}
 	}
-	fmt.Printf("XXX: MountVolume: mkdir 2: %s\n", deviceMountPath)
 	if err = os.MkdirAll(deviceMountPath, 0750); err != nil {
 		glog.Errorf("mkdir failed on disk %s (%v)", deviceMountPath, err)
 		return err
@@ -278,10 +255,8 @@ func (u *storageosUtil) MountVolume(b *storageosMounter, mntDevice, deviceMountP
 		options = append(options, "ro")
 	}
 	if notMnt {
-		fmt.Printf("XXX: MountVolume: FormatAndMount(%s, %s, %s, %v)\n", mntDevice, deviceMountPath, b.fsType, options)
 		err = b.diskMounter.FormatAndMount(mntDevice, deviceMountPath, b.fsType, options)
 		if err != nil {
-			fmt.Printf("XXX PANIC: MountVolume: FormatAndMount() err: %v\n", err)
 			os.Remove(deviceMountPath)
 			return err
 		}
@@ -289,7 +264,6 @@ func (u *storageosUtil) MountVolume(b *storageosMounter, mntDevice, deviceMountP
 	if err != nil {
 		return err
 	}
-	fmt.Printf("XXX: MountVolume: done, updating kv\n")
 
 	opts := storageostypes.VolumeMountOptions{
 		Name:      b.volName,
@@ -306,27 +280,12 @@ func (u *storageosUtil) MountVolume(b *storageosMounter, mntDevice, deviceMountP
 
 // Unmount unmounts the volume on the host.
 func (u *storageosUtil) UnmountVolume(b *storageosUnmounter) error {
-	fmt.Printf("XXX: UnmountVolume: namespace: %s, volName: %s\n", b.namespace, b.volName)
-	if b.namespace == "" || b.volName == "" {
-		fmt.Printf("XXX PANIC: UnmountVolume: namespace: %s, volName: %s\n", b.namespace, b.volName)
-	}
-
-	// opts := storageostypes.VolumeUnmountOptions{
-	// 	Name:      b.volName,
-	// 	Namespace: b.namespace,
-	// 	Client:    b.plugin.host.GetHostName(),
-	// }
-	//
-	// return u.client().VolumeUnmount(opts)
+	// Nothing to update in the API, we only need to update on detach.
 	return nil
 }
 
 // Deletes a StorageOS volume.  Assumes it has already been unmounted and detached.
 func (u *storageosUtil) DeleteVolume(d *storageosDeleter) error {
-	fmt.Printf("XXX: DeleteVolume: namespace: %s, volName: %s\n", d.namespace, d.volName)
-	if d.namespace == "" || d.volName == "" {
-		fmt.Printf("XXX PANIC: DeleteVolume: namespace: %s, volName: %s\n", d.namespace, d.volName)
-	}
 	apiCfg := &namespacedSecret{
 		secretName: apiSecretName,
 		namespace:  d.namespace,

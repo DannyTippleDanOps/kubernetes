@@ -36,7 +36,12 @@ import (
 
 var testApiSecretName = "storageos-api"
 var testVolName = "storageos-test-vol"
+var testPVName = "storageos-test-pv"
 var testNamespace = "storageos-test-namespace"
+var testSize = 1
+var testDesc = "testdescription"
+var testPool = "testpool"
+var testFSType = "ext2"
 var testVolUUID = "01c43d34-89f8-83d3-422b-43536a0f25e6"
 
 func TestDefaultAPIConfig(t *testing.T) {
@@ -281,31 +286,28 @@ func TestCreateVolume(t *testing.T) {
 	util := &storageosUtil{}
 	util.api = fakeAPI{}
 
-	pvName := "testpvname"
-	namespace := "testnamespace"
-	description := "testdescription"
-	pool := "testpool"
 	labels := map[string]string{
 		"labelA": "valueA",
 		"labelB": "valueB",
 	}
-	fsType := "ext2"
 
 	options := volume.VolumeOptions{
-		PVName: pvName,
-		PVC:    volumetest.CreateTestPVC("10Gi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+		PVName: testPVName,
+		PVC:    volumetest.CreateTestPVC(fmt.Sprintf("%dGi", testSize), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
-	options.PVC.Namespace = namespace
-	options.PVC.Labels = labels
 
 	provisioner := &storageosProvisioner{
 		storageos: &storageos{
+			volName:     testVolName,
+			namespace:   testNamespace,
+			size:        testSize,
+			pool:        testPool,
+			description: testDesc,
+			fsType:      testFSType,
+			labels:      labels,
 			manager:     util,
 			plugin:      plug.(*storageosPlugin),
-			pool:        pool,
-			description: description,
-			fsType:      fsType,
 		},
 		options: options,
 	}
@@ -320,19 +322,19 @@ func TestCreateVolume(t *testing.T) {
 	if vol.ID == "" {
 		t.Error("CreateVolume() vol ID is empty")
 	}
-	if vol.Name != pvName {
+	if vol.Name != testVolName {
 		t.Errorf("CreateVolume() returned unexpected Name %s", vol.Name)
 	}
-	if vol.Namespace != namespace {
+	if vol.Namespace != testNamespace {
 		t.Errorf("CreateVolume() returned unexpected Namespace %s", vol.Namespace)
 	}
-	if vol.Pool != pool {
+	if vol.Pool != testPool {
 		t.Errorf("CreateVolume() returned unexpected Pool %s", vol.Pool)
 	}
-	if vol.FSType != fsType {
+	if vol.FSType != testFSType {
 		t.Errorf("CreateVolume() returned unexpected FSType %s", vol.FSType)
 	}
-	if vol.Size != 10 {
+	if vol.Size != testSize {
 		t.Errorf("CreateVolume() returned unexpected Size %d", vol.Size)
 	}
 	if len(vol.Labels) == 0 {
