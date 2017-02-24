@@ -65,6 +65,9 @@ func SetObjectDefaults_CronJob(in *CronJob) {
 		if a.VolumeSource.AzureDisk != nil {
 			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
+		if a.VolumeSource.ScaleIO != nil {
+			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+		}
 		if a.VolumeSource.Projected != nil {
 			v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 			for j := range a.VolumeSource.Projected.Sources {
@@ -78,9 +81,6 @@ func SetObjectDefaults_CronJob(in *CronJob) {
 					}
 				}
 			}
-		}
-		if a.VolumeSource.ScaleIO != nil {
-			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 	}
 	for i := range in.Spec.JobTemplate.Spec.Template.Spec.InitContainers {
@@ -205,6 +205,9 @@ func SetObjectDefaults_JobTemplate(in *JobTemplate) {
 		if a.VolumeSource.AzureDisk != nil {
 			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
+		if a.VolumeSource.ScaleIO != nil {
+			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+		}
 		if a.VolumeSource.Projected != nil {
 			v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 			for j := range a.VolumeSource.Projected.Sources {
@@ -218,9 +221,6 @@ func SetObjectDefaults_JobTemplate(in *JobTemplate) {
 					}
 				}
 			}
-		}
-		if a.VolumeSource.ScaleIO != nil {
-			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 	}
 	for i := range in.Template.Spec.Template.Spec.InitContainers {

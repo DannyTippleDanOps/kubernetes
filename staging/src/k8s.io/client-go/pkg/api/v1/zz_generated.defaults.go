@@ -193,6 +193,9 @@ func SetObjectDefaults_Pod(in *Pod) {
 		if a.VolumeSource.AzureDisk != nil {
 			SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
+		if a.VolumeSource.ScaleIO != nil {
+			SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+		}
 		if a.VolumeSource.Projected != nil {
 			SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 			for j := range a.VolumeSource.Projected.Sources {
@@ -206,9 +209,6 @@ func SetObjectDefaults_Pod(in *Pod) {
 					}
 				}
 			}
-		}
-		if a.VolumeSource.ScaleIO != nil {
-			SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 	}
 	for i := range in.Spec.InitContainers {
@@ -341,6 +341,9 @@ func SetObjectDefaults_PodTemplate(in *PodTemplate) {
 		if a.VolumeSource.AzureDisk != nil {
 			SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
+		if a.VolumeSource.ScaleIO != nil {
+			SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+		}
 		if a.VolumeSource.Projected != nil {
 			SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 			for j := range a.VolumeSource.Projected.Sources {
@@ -354,9 +357,6 @@ func SetObjectDefaults_PodTemplate(in *PodTemplate) {
 					}
 				}
 			}
-		}
-		if a.VolumeSource.ScaleIO != nil {
-			SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 	}
 	for i := range in.Template.Spec.InitContainers {
@@ -483,6 +483,9 @@ func SetObjectDefaults_ReplicationController(in *ReplicationController) {
 			if a.VolumeSource.AzureDisk != nil {
 				SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 			}
+			if a.VolumeSource.ScaleIO != nil {
+				SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			}
 			if a.VolumeSource.Projected != nil {
 				SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 				for j := range a.VolumeSource.Projected.Sources {
@@ -496,9 +499,6 @@ func SetObjectDefaults_ReplicationController(in *ReplicationController) {
 						}
 					}
 				}
-			}
-			if a.VolumeSource.ScaleIO != nil {
-				SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 			}
 		}
 		for i := range in.Spec.Template.Spec.InitContainers {
