@@ -70,6 +70,9 @@ func SetObjectDefaults_PodPreset(in *PodPreset) {
 		if a.VolumeSource.AzureDisk != nil {
 			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
+		if a.VolumeSource.ScaleIO != nil {
+			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+		}
 		if a.VolumeSource.Projected != nil {
 			v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 			for j := range a.VolumeSource.Projected.Sources {
@@ -83,9 +86,6 @@ func SetObjectDefaults_PodPreset(in *PodPreset) {
 					}
 				}
 			}
-		}
-		if a.VolumeSource.ScaleIO != nil {
-			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 	}
 }
